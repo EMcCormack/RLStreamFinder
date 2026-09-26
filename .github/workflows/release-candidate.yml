@@ -1,0 +1,96 @@
+name: Build release candidate
+
+on: workflow_dispatch
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref }}
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.3.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Check tag matches package version
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          test "$GITHUB_REF_TYPE" = "tag"
+          test "$RELEASE_TAG" = "v$(node -p "require('./package.json').version")"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+
+  build:
+    needs: checks
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            asset_path: out/make/zip/linux/**/*.zip
+          - os: windows-latest
+            platform: windows
+            asset_path: out/make/squirrel.windows/**/*.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref }}
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.3.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build Linux ZIP
+        if: matrix.platform == 'linux'
+        run: pnpm make:linux:zip
+      - name: Build Windows installer
+        if: matrix.platform == 'windows'
+        run: pnpm make:windows
+      - uses: actions/upload-artifact@v7
+        with:
+          name: rl-stream-finder-${{ matrix.platform }}
+          path: ${{ matrix.asset_path }}
+          if-no-files-found: error
+
+  draft-release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: rl-stream-finder-*
+          path: release-assets
+          merge-multiple: true
+      - name: Create draft prerelease with checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          mapfile -d '' assets < <(find release-assets -type f -print0)
+          test "${#assets[@]}" -gt 0
+          for file in "${assets[@]}"; do
+            hash=$(sha256sum "$file" | cut -d ' ' -f 1)
+            printf '%s  %s\n' "$hash" "$(basename "$file")"
+          done > release-assets/SHA256SUMS
+          gh release create "$RELEASE_TAG" "${assets[@]}" release-assets/SHA256SUMS \
+            --verify-tag --draft --prerelease --title "$RELEASE_TAG Preview" --generate-notes

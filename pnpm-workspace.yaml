@@ -1,0 +1,10 @@
+onlyBuiltDependencies:
+  - electron
+  - electron-winstaller
+
+# Use the hoisted node linker to avoid issues with Electron and native modules
+nodeLinker: hoisted
+
+allowBuilds:
+  electron: true
+  electron-winstaller: true
