@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { test, expect } from "@playwright/test";
-import { _electron as electron } from "playwright";
+import { launchTestElectron } from "./launch-electron";
 
 const appRoot = path.resolve(process.cwd());
 const screenshotPath = path.join(appRoot, "docs/screenshots/live-match-demo.png");
@@ -32,12 +32,8 @@ const demoResults = {
   },
 };
 
-test("captures the fixed Musty, TenacityTV, and AlphaKepTV demo", async () => {
-  const env: NodeJS.ProcessEnv = { ...process.env, ELECTRON_ENABLE_LOGGING: "1" };
-  delete env.ELECTRON_RUN_AS_NODE;
-  delete env.VITE_DEV_SERVER_URL;
-
-  const electronApp = await electron.launch({ args: [appRoot], cwd: appRoot, env });
+test("captures the fixed Musty, TenacityTV, and AlphaKepTV demo", async ({}, testInfo) => {
+  const electronApp = await launchTestElectron(testInfo);
   try {
     const page = await electronApp.firstWindow();
     await page.setViewportSize({ width: 1280, height: 820 });

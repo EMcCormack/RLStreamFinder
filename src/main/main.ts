@@ -16,6 +16,12 @@ import { TwitchApiError, TwitchAuthRequiredError, TwitchClient } from "./service
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
+const e2eUserDataDir = process.env.RL_STREAM_FINDER_E2E_USER_DATA_DIR;
+if (e2eUserDataDir) {
+  app.setPath("userData", e2eUserDataDir);
+  app.setPath("sessionData", e2eUserDataDir);
+}
+
 if (squirrelStartup) {
   app.quit();
 }

@@ -1,24 +1,5 @@
-import path from "node:path";
 import { test, expect } from "@playwright/test";
-import { _electron as electron } from "playwright";
-
-const appRoot = path.resolve(process.cwd());
-
-async function launchElectron() {
-  const env: NodeJS.ProcessEnv = {
-    ...process.env,
-    ELECTRON_ENABLE_LOGGING: "1",
-  };
-  delete env.ELECTRON_RUN_AS_NODE;
-
-  delete env.VITE_DEV_SERVER_URL;
-
-  return electron.launch({
-    args: [appRoot],
-    cwd: appRoot,
-    env,
-  });
-}
+import { launchTestElectron } from "./launch-electron";
 
 async function installSmokeIpcMocks(electronApp, identitySource = "explicit") {
   await electronApp.evaluate(({ ipcMain }, localPlayerIdentitySource) => {
@@ -120,8 +101,8 @@ async function installSmokeIpcMocks(electronApp, identitySource = "explicit") {
   }, identitySource);
 }
 
-test("launches Electron, renders the app, exposes preload bridge, and automatically scans mocked players", async () => {
-  const electronApp = await launchElectron();
+test("launches Electron, renders the app, exposes preload bridge, and automatically scans mocked players", async ({}, testInfo) => {
+  const electronApp = await launchTestElectron(testInfo);
 
   try {
     const page = await electronApp.firstWindow();
@@ -202,8 +183,8 @@ test("launches Electron, renders the app, exposes preload bridge, and automatica
 });
 
 
-test("disconnected connection cards open troubleshooting and automatic setup", async () => {
-  const electronApp = await launchElectron();
+test("disconnected connection cards open troubleshooting and automatic setup", async ({}, testInfo) => {
+  const electronApp = await launchTestElectron(testInfo);
   try {
     const page = await electronApp.firstWindow();
     await installSmokeIpcMocks(electronApp);
@@ -248,8 +229,8 @@ test("disconnected connection cards open troubleshooting and automatic setup", a
   }
 });
 
-test("moves streamers below Previous Streamers when the board clears", async () => {
-  const electronApp = await launchElectron();
+test("moves streamers below Previous Streamers when the board clears", async ({}, testInfo) => {
+  const electronApp = await launchTestElectron(testInfo);
   try {
     const page = await electronApp.firstWindow();
     await installSmokeIpcMocks(electronApp);
@@ -290,8 +271,8 @@ test("moves streamers below Previous Streamers when the board clears", async () 
   }
 });
 
-test("keeps ten previous streamers in a five-row scroll area", async () => {
-  const electronApp = await launchElectron();
+test("keeps ten previous streamers in a five-row scroll area", async ({}, testInfo) => {
+  const electronApp = await launchTestElectron(testInfo);
   try {
     const page = await electronApp.firstWindow();
     await installSmokeIpcMocks(electronApp);
