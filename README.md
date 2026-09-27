@@ -13,7 +13,16 @@ RLStreamFinder helps you spot potential Twitch streamers in your live Rocket Lea
 
 Rocket League and this app must run on the same computer. Live roster capture supports Windows and Linux installations using Wine or Proton. You also need a Twitch account to check channels and live status; sign-in happens on Twitch's site.
 
-This repository currently provides a **source build**. Install [Node.js 24](https://nodejs.org/), then install the project’s pnpm version and run:
+Download the latest build from the [Releases page](https://github.com/EMcCormack/RLStreamFinder/releases). The first release, [v0.1.0 Preview](https://github.com/EMcCormack/RLStreamFinder/releases/tag/v0.1.0), provides:
+
+- **Windows:** Download `RLStreamFinder-0.1.0.Setup.exe`, run the installer, then open **RLStreamFinder** from the Start menu. The installer is currently unsigned, so Windows may show a security warning.
+- **Linux (x64):** Download `RLStreamFinder-linux-x64-0.1.0.zip`, extract it, then run `rl-stream-finder` from the extracted folder.
+
+No Node.js or pnpm installation is needed for these downloads. The release also includes `SHA256SUMS` if you want to verify the downloaded files.
+
+### Run from source
+
+Install [Node.js 24](https://nodejs.org/), then install the project’s pnpm version and run:
 
 ```bash
 npm install --global pnpm@11.3.0
@@ -23,9 +32,7 @@ pnpm install --frozen-lockfile
 pnpm start
 ```
 
-To create a local packaged app instead, run `pnpm package` and open the app in `out/RLStreamFinder-<platform>-<arch>/`. The [Releases page](https://github.com/EMcCormack/RLStreamFinder/releases) is where downloadable builds can be posted later.
-
-On Linux, run `pnpm make:linux:zip` to create a ZIP containing the packaged app under `out/make/`. Extract it and run `rl-stream-finder` from the extracted folder.
+To create a local packaged app instead, run `pnpm package` and open the app in `out/RLStreamFinder-<platform>-<arch>/`.
 
 ## First-time setup
 
