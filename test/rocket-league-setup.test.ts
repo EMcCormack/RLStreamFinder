@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promis
 import os from "node:os";
 import path from "node:path";
 import { afterEach, expect, test } from "vitest";
-import { configureStatsIni, findDefaultRocketLeagueInstallation, setupRocketLeagueStats } from "../src/main/services/rocket-league-setup";
+import { configureStatsIni, findDefaultRocketLeagueInstallation, findDefaultRocketLeagueInstallations, setupRocketLeagueStats } from "../src/main/services/rocket-league-setup";
 
 const directories: string[] = [];
 afterEach(async () => {
@@ -64,4 +64,42 @@ test("finds a default Steam installation and otherwise leaves selection to the c
   await mkdir(path.join(install, "TAGame", "Config"), { recursive: true });
   await writeFile(path.join(install, "TAGame", "Config", "DefaultStatsAPI.ini"), "[Other]\n");
   expect(await findDefaultRocketLeagueInstallation({ platform: "linux", home })).toBe(install);
+});
+
+test("finds a Heroic Rocket League installation on Linux", async () => {
+  const home = await mkdtemp(path.join(os.tmpdir(), "rl-heroic-home-"));
+  directories.push(home);
+  const install = path.join(home, "Games", "Heroic", "Rocket League");
+  await mkdir(path.join(install, "TAGame", "Config"), { recursive: true });
+  await writeFile(path.join(install, "TAGame", "Config", "DefaultStatsAPI.ini"), "[Other]\n");
+  await mkdir(path.join(home, ".config", "heroic"), { recursive: true });
+  await writeFile(path.join(home, ".config", "heroic", "gamesConfig.json"), JSON.stringify({
+    "Rocket League": { install_path: install },
+  }));
+
+  expect(await findDefaultRocketLeagueInstallation({ platform: "linux", home })).toBe(install);
+});
+
+test("finds both Steam and Epic installations on Windows", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "rl-windows-"));
+  directories.push(root);
+  const steam = path.join(root, "Steam", "steamapps", "common", "rocketleague");
+  const epic = path.join(root, "Epic Games", "rocketleague");
+  for (const install of [steam, epic]) {
+    const config = path.join(install, "TAGame", "Config");
+    await mkdir(config, { recursive: true });
+    await writeFile(path.join(config, "DefaultStatsAPI.ini"), "[TAGame.MatchStatsExporter_TA]\nPort=0\n");
+  }
+
+  const installations = await findDefaultRocketLeagueInstallations({
+    platform: "win32",
+    env: { "PROGRAMFILES(X86)": root },
+  });
+
+  expect(installations).toEqual([steam, epic]);
+  await Promise.all(installations.map((install) => setupRocketLeagueStats(install)));
+  for (const install of installations) {
+    expect(await readFile(path.join(install, "TAGame", "Config", "DefaultStatsAPI.ini"), "utf8"))
+      .toContain("Port=49123");
+  }
 });

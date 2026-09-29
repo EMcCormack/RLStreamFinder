@@ -7,7 +7,7 @@ import {
   extractLiveMatchSnapshot,
   preserveMatchRoster,
 } from "./services/rocket-league-stats";
-import { findDefaultRocketLeagueInstallation, setupRocketLeagueStats } from "./services/rocket-league-setup";
+import { findDefaultRocketLeagueInstallations, setupRocketLeagueStats } from "./services/rocket-league-setup";
 import { RocketLeagueConnectionPoller } from "./services/rocket-league-poller";
 import { Channels } from "../shared/ipc-contracts";
 import { checkPlayers } from "../shared/pipeline";
@@ -432,9 +432,9 @@ if (!squirrelStartup) app.whenReady().then(() => {
     if (process.platform !== "win32" && process.platform !== "linux") {
       return { configured: false, message: "Automatic setup supports Windows and Linux Wine/Proton installations. Follow the manual steps on the computer running Rocket League." };
     }
-    const defaultInstallation = await findDefaultRocketLeagueInstallation();
-    let installDirectory = defaultInstallation;
-    if (!installDirectory) {
+    const defaultInstallations = await findDefaultRocketLeagueInstallations();
+    let installDirectories = defaultInstallations;
+    if (installDirectories.length === 0) {
       const selection = await dialog.showOpenDialog(mainWindow, {
         title: "Choose the Rocket League installation folder (contains TAGame)",
         buttonLabel: "Configure Stats API",
@@ -443,10 +443,18 @@ if (!squirrelStartup) app.whenReady().then(() => {
       if (selection.canceled || !selection.filePaths[0]) {
         return { configured: false, canceled: true, message: "Setup canceled. No settings were changed." };
       }
-      installDirectory = selection.filePaths[0];
+      installDirectories = [selection.filePaths[0]];
     }
     try {
-      return await setupRocketLeagueStats(installDirectory);
+      const results = await Promise.all(installDirectories.map((installDirectory) => setupRocketLeagueStats(installDirectory)));
+      const configuredCount = results.filter((result) => !result.message.includes("already configured")).length;
+      const installationLabel = installDirectories.length === 1 ? "installation" : "installations";
+      return {
+        configured: true,
+        message: configuredCount > 0
+          ? `Stats API configured in ${configuredCount} of ${installDirectories.length} Rocket League ${installationLabel}. Restart Rocket League, join a match, then click Connect RL.`
+          : `Stats API is already configured in all detected Rocket League ${installationLabel}. Restart Rocket League, join a match, then click Connect RL.`,
+      };
     } catch (error) {
       if (error.code === "EACCES" || error.code === "EPERM") {
         throw new Error("Rocket League's configuration could not be written. Use the manual setup steps with a text editor that has permission to edit the installation folder.");

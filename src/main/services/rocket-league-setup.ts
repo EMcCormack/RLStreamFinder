@@ -52,9 +52,53 @@ async function isExistingFile(filePath: string): Promise<boolean> {
   }
 }
 
+function isRocketLeagueName(value: unknown): boolean {
+  return typeof value === "string" && value.toLowerCase().replace(/[^a-z0-9]/g, "").includes("rocketleague");
+}
 
-/** Find a standard Steam or Epic installation that contains the Stats API config. */
-export async function findDefaultRocketLeagueInstallation({
+function collectHeroicInstallPaths(value: unknown, keyHint = "", paths: string[] = []): string[] {
+  if (!value || typeof value !== "object") return paths;
+  if (Array.isArray(value)) {
+    for (const entry of value) collectHeroicInstallPaths(entry, keyHint, paths);
+    return paths;
+  }
+
+  const record = value as Record<string, unknown>;
+  const identity = [keyHint, record.appName, record.app_name, record.name, record.title, record.appId, record.appid]
+    .some(isRocketLeagueName);
+  if (identity) {
+    for (const field of [record.install_path, record.installPath, record.installDir, record.installDirectory]) {
+      if (typeof field === "string") paths.push(field);
+    }
+  }
+  for (const [key, entry] of Object.entries(record)) {
+    collectHeroicInstallPaths(entry, key, paths);
+  }
+  return paths;
+}
+
+async function findHeroicRocketLeagueInstallations(home: string): Promise<string[]> {
+  const metadataPaths = [
+    path.join(home, ".config", "heroic", "gamesConfig.json"),
+    path.join(home, ".config", "heroic", "legendaryConfig", "legendaryInstalled.json"),
+    path.join(home, ".var", "app", "com.heroicgameslauncher.hgl", "config", "heroic", "gamesConfig.json"),
+    path.join(home, ".var", "app", "com.heroicgameslauncher.hgl", "config", "heroic", "legendaryConfig", "legendaryInstalled.json"),
+  ];
+  const installations: string[] = [];
+  for (const metadataPath of metadataPaths) {
+    try {
+      const metadata = JSON.parse(await readFile(metadataPath, "utf8"));
+      installations.push(...collectHeroicInstallPaths(metadata));
+    } catch (error) {
+      if (error.code !== "ENOENT") continue;
+    }
+  }
+  return installations;
+}
+
+
+/** Find standard Steam or Epic installations that contain the Stats API config. */
+export async function findDefaultRocketLeagueInstallations({
   platform = process.platform,
   home = os.homedir(),
   env = process.env,
@@ -62,7 +106,7 @@ export async function findDefaultRocketLeagueInstallation({
   platform?: string;
   home?: string;
   env?: NodeJS.ProcessEnv;
-} = {}): Promise<string | null> {
+} = {}): Promise<string[]> {
   const candidates: string[] = [];
   if (platform === "win32") {
     for (const base of [env["PROGRAMFILES(X86)"], env.PROGRAMFILES, env["ProgramW6432"]]) {
@@ -79,15 +123,21 @@ export async function findDefaultRocketLeagueInstallation({
     ]) {
       candidates.push(path.join(steamRoot, "steamapps", "common", "rocketleague"));
     }
+    candidates.push(...await findHeroicRocketLeagueInstallations(home));
   }
+  const installations: string[] = [];
   for (const candidate of new Set(candidates)) {
     const config = path.join(candidate, "TAGame", "Config");
     if (await isExistingFile(path.join(config, "TAStatsAPI.ini")) ||
       await isExistingFile(path.join(config, "DefaultStatsAPI.ini"))) {
-      return candidate;
+      installations.push(candidate);
     }
   }
-  return null;
+  return installations;
+}
+
+export async function findDefaultRocketLeagueInstallation(options: Parameters<typeof findDefaultRocketLeagueInstallations>[0] = {}): Promise<string | null> {
+  return (await findDefaultRocketLeagueInstallations(options))[0] ?? null;
 }
 
 export async function setupRocketLeagueStats(installDirectory: string) {
