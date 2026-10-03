@@ -2,6 +2,12 @@ import { contextBridge, ipcRenderer } from "electron";
 import { Channels } from "../shared/ipc-contracts";
 
 contextBridge.exposeInMainWorld("rocketLeagueViewer", {
+  getSetupCompleted() {
+    return ipcRenderer.invoke(Channels.SETUP_STATUS);
+  },
+  completeSetup() {
+    return ipcRenderer.invoke(Channels.SETUP_COMPLETE);
+  },
   startTwitchAuth() {
     return ipcRenderer.invoke(Channels.TWITCH_START_AUTH);
   },
@@ -16,6 +22,9 @@ contextBridge.exposeInMainWorld("rocketLeagueViewer", {
   },
   setupRocketLeague() {
     return ipcRenderer.invoke(Channels.RL_SETUP);
+  },
+  getRocketLeagueSetupAvailability() {
+    return ipcRenderer.invoke(Channels.RL_SETUP_AVAILABILITY);
   },
   connectRocketLeague() {
     return ipcRenderer.invoke(Channels.RL_CONNECT);

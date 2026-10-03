@@ -1,7 +1,13 @@
 import { test, expect } from "@playwright/test";
 import { launchTestElectron } from "./launch-electron";
 
-async function installSmokeIpcMocks(electronApp, identitySource = "explicit") {
+async function installSmokeIpcMocks(electronApp, identitySource = "explicit", skipSetup = true) {
+  if (skipSetup) {
+    await electronApp.evaluate(({ ipcMain }) => {
+      ipcMain.removeHandler("setup:status");
+      ipcMain.handle("setup:status", () => true);
+    });
+  }
   await electronApp.evaluate(({ ipcMain }, localPlayerIdentitySource) => {
     const snapshot = {
       matchGuid: "PLAYWRIGHT-SMOKE-001",
@@ -100,6 +106,97 @@ async function installSmokeIpcMocks(electronApp, identitySource = "explicit") {
     ipcMain.handle("rocket-league:load-players", async () => snapshot);
   }, identitySource);
 }
+
+test("guides first launch through setup and remembers completion after restarting", async ({}, testInfo) => {
+  let electronApp = await launchTestElectron(testInfo);
+  try {
+    const page = await electronApp.firstWindow();
+    await installSmokeIpcMocks(electronApp, "explicit", false);
+    await electronApp.evaluate(({ ipcMain }) => {
+      ipcMain.removeHandler("twitch:verify");
+      ipcMain.handle("twitch:verify", () => { throw new Error("Not signed in"); });
+      ipcMain.removeHandler("rocket-league:setup-availability");
+      ipcMain.handle("rocket-league:setup-availability", () => ({ supported: true, installationCount: 1 }));
+      let attempts = 0;
+      ipcMain.removeHandler("rocket-league:setup");
+      ipcMain.handle("rocket-league:setup", () => {
+        attempts += 1;
+        if (attempts === 1) return { configured: false, canceled: true, message: "Setup canceled. No settings were changed." };
+        if (attempts === 2) throw new Error("Configuration could not be written.");
+        return { configured: true, message: "Stats API configured. Restart Rocket League." };
+      });
+    });
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: "Find the streamers in your match." })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Live Match Scanner" })).toHaveCount(0);
+    await expect(page.getByText("Found Rocket League. Automatic setup is available. Close the game before continuing.")).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath("first-launch-setup.png"), fullPage: true });
+    await page.getByRole("button", { name: "Set up automatically", exact: true }).click();
+    await expect(page.getByText("Setup canceled. No settings were changed.")).toBeVisible();
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: "Find the streamers in your match." })).toBeVisible();
+    await page.getByRole("button", { name: "Set up automatically", exact: true }).click();
+    await expect(page.getByText("Configuration could not be written.")).toBeVisible();
+    await page.getByRole("button", { name: "Set up automatically", exact: true }).click();
+    await expect(page.getByText("Configuration saved", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Connect Twitch", exact: true }).click();
+    await expect(page.getByText("Signed in", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Open match scanner", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Live Match Scanner" })).toBeVisible();
+    await electronApp.close();
+    electronApp = await launchTestElectron(testInfo);
+    await expect((await electronApp.firstWindow()).getByRole("heading", { name: "Live Match Scanner" })).toBeVisible();
+  } finally {
+    await electronApp.close();
+  }
+});
+
+test("adapts setup to missing installations, unsupported platforms, and detection failures", async ({}, testInfo) => {
+  const electronApp = await launchTestElectron(testInfo);
+  try {
+    const page = await electronApp.firstWindow();
+    for (const state of ["missing", "unsupported", "failed"]) {
+      await electronApp.evaluate(({ ipcMain }, state) => {
+        ipcMain.removeHandler("rocket-league:setup-availability");
+        ipcMain.handle("rocket-league:setup-availability", () => {
+          if (state === "failed") throw new Error("Unable to read installation folders");
+          return { supported: state !== "unsupported", installationCount: 0 };
+        });
+        ipcMain.removeHandler("rocket-league:setup");
+        ipcMain.handle("rocket-league:setup", () => ({ configured: false, canceled: true, message: "Setup canceled. No settings were changed." }));
+      }, state);
+      await page.reload({ waitUntil: "domcontentloaded" });
+      if (state === "unsupported") {
+        await expect(page.getByText(/Automatic setup supports Windows and Linux/)).toBeVisible();
+        await expect(page.getByRole("button", { name: "Set up automatically", exact: true })).toHaveCount(0);
+        await page.getByRole("button", { name: "Manual setup and troubleshooting" }).click();
+        await expect(page.getByRole("dialog", { name: "Rocket League setup and troubleshooting" })).toBeVisible();
+        await page.getByRole("button", { name: "Close troubleshooting" }).click();
+      } else {
+        const button = page.getByRole("button", { name: state === "missing" ? "Choose installation folder" : "Try automatic setup", exact: true });
+        await expect(button).toBeEnabled();
+        await button.click();
+        await expect(page.getByText("Setup canceled. No settings were changed.")).toBeVisible();
+      }
+    }
+  } finally {
+    await electronApp.close();
+  }
+});
+
+test("allows first-launch setup to be finished later", async ({}, testInfo) => {
+  const electronApp = await launchTestElectron(testInfo);
+  try {
+    const page = await electronApp.firstWindow();
+    await expect(page.getByRole("heading", { name: "Find the streamers in your match." })).toBeVisible();
+    await page.getByRole("button", { name: "Open match scanner", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Live Match Scanner" })).toBeVisible();
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: "Live Match Scanner" })).toBeVisible();
+  } finally {
+    await electronApp.close();
+  }
+});
 
 test("launches Electron, renders the app, exposes preload bridge, and automatically scans mocked players", async ({}, testInfo) => {
   const electronApp = await launchTestElectron(testInfo);

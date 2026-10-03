@@ -40,7 +40,10 @@ jobs:
             asset_path: out/make/zip/linux/**/*.zip
           - os: windows-latest
             platform: windows
-            asset_path: out/make/squirrel.windows/**/*.exe
+            asset_path: |
+              out/make/squirrel.windows/**/*.exe
+              out/make/squirrel.windows/**/*.nupkg
+              out/make/squirrel.windows/**/RELEASES
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7

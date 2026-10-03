@@ -1,5 +1,5 @@
 import path from "node:path";
-import { app, BrowserWindow, dialog, ipcMain, safeStorage, session, shell } from "electron";
+import { app, autoUpdater, BrowserWindow, dialog, ipcMain, safeStorage, session, shell } from "electron";
 import squirrelStartup from "electron-squirrel-startup";
 import { TWITCH_CLIENT_ID, TWITCH_SCOPES } from "./services/app-config";
 import {
@@ -7,9 +7,11 @@ import {
   extractLiveMatchSnapshot,
   preserveMatchRoster,
 } from "./services/rocket-league-stats";
-import { findDefaultRocketLeagueInstallations, setupRocketLeagueStats } from "./services/rocket-league-setup";
+import { findDefaultRocketLeagueInstallations, getRocketLeagueSetupAvailability, setupRocketLeagueStats } from "./services/rocket-league-setup";
 import { RocketLeagueConnectionPoller } from "./services/rocket-league-poller";
+import { startWindowsUpdates } from "./services/app-updates";
 import { Channels } from "../shared/ipc-contracts";
+import { completeSetup, getSetupCompleted } from "./services/setup-preferences";
 import { checkPlayers } from "../shared/pipeline";
 import { TwitchApiError, TwitchAuthRequiredError, TwitchClient } from "./services/twitch";
 
@@ -339,6 +341,8 @@ function createTokenCodec() {
 }
 
 if (!squirrelStartup) app.whenReady().then(() => {
+  ipcMain.handle(Channels.SETUP_STATUS, () => getSetupCompleted(app.getPath("userData")));
+  ipcMain.handle(Channels.SETUP_COMPLETE, () => completeSetup(app.getPath("userData")));
   registerTwitchEmbedHeaderPatch();
   let twitchClient: TwitchClient | null = null;
   function createTwitchClient() {
@@ -427,6 +431,8 @@ if (!squirrelStartup) app.whenReady().then(() => {
       throw new Error(formatTwitchError(error));
     }
   });
+
+  ipcMain.handle(Channels.RL_SETUP_AVAILABILITY, () => getRocketLeagueSetupAvailability());
 
   ipcMain.handle(Channels.RL_SETUP, async () => {
     if (process.platform !== "win32" && process.platform !== "linux") {
@@ -525,6 +531,13 @@ if (!squirrelStartup) app.whenReady().then(() => {
   });
 
   createMainWindow();
+
+  const stopUpdates = startWindowsUpdates({
+    isPackaged: app.isPackaged,
+    updater: autoUpdater,
+    showMessageBox: (options) => dialog.showMessageBox(mainWindow, options),
+  });
+  app.once("before-quit", stopUpdates);
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {

@@ -3,6 +3,7 @@ import os from "node:os";
 import { constants } from "node:fs";
 import { copyFile, readFile, stat, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
+import type { RocketLeagueSetupAvailability } from "../../shared/ipc-contracts";
 
 const STATS_SECTION = "tagame.matchstatsexporter_ta";
 
@@ -138,6 +139,17 @@ export async function findDefaultRocketLeagueInstallations({
 
 export async function findDefaultRocketLeagueInstallation(options: Parameters<typeof findDefaultRocketLeagueInstallations>[0] = {}): Promise<string | null> {
   return (await findDefaultRocketLeagueInstallations(options))[0] ?? null;
+}
+
+export async function getRocketLeagueSetupAvailability(
+  options: Parameters<typeof findDefaultRocketLeagueInstallations>[0] = {},
+): Promise<RocketLeagueSetupAvailability> {
+  const platform = options.platform ?? process.platform;
+  if (platform !== "win32" && platform !== "linux") {
+    return { supported: false, installationCount: 0 };
+  }
+  const installations = await findDefaultRocketLeagueInstallations(options);
+  return { supported: true, installationCount: installations.length };
 }
 
 export async function setupRocketLeagueStats(installDirectory: string) {

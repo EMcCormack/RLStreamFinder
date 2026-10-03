@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promis
 import os from "node:os";
 import path from "node:path";
 import { afterEach, expect, test } from "vitest";
-import { configureStatsIni, findDefaultRocketLeagueInstallation, findDefaultRocketLeagueInstallations, setupRocketLeagueStats } from "../src/main/services/rocket-league-setup";
+import { configureStatsIni, findDefaultRocketLeagueInstallation, findDefaultRocketLeagueInstallations, getRocketLeagueSetupAvailability, setupRocketLeagueStats } from "../src/main/services/rocket-league-setup";
 
 const directories: string[] = [];
 afterEach(async () => {
@@ -97,9 +97,28 @@ test("finds both Steam and Epic installations on Windows", async () => {
   });
 
   expect(installations).toEqual([steam, epic]);
+  expect(await getRocketLeagueSetupAvailability({ platform: "win32", env: { "PROGRAMFILES(X86)": root } }))
+    .toEqual({ supported: true, installationCount: 2 });
+  for (const install of installations) {
+    const config = path.join(install, "TAGame", "Config");
+    expect(await readdir(config)).toEqual(["DefaultStatsAPI.ini"]);
+    expect(await readFile(path.join(config, "DefaultStatsAPI.ini"), "utf8"))
+      .toContain("Port=0");
+  }
   await Promise.all(installations.map((install) => setupRocketLeagueStats(install)));
   for (const install of installations) {
     expect(await readFile(path.join(install, "TAGame", "Config", "DefaultStatsAPI.ini"), "utf8"))
       .toContain("Port=49123");
   }
+});
+
+
+test("reports missing installations and unsupported platforms without configuring anything", async () => {
+  const home = await mkdtemp(path.join(os.tmpdir(), "rl-detection-"));
+  directories.push(home);
+  expect(await getRocketLeagueSetupAvailability({ platform: "linux", home }))
+    .toEqual({ supported: true, installationCount: 0 });
+  expect(await getRocketLeagueSetupAvailability({ platform: "darwin", home }))
+    .toEqual({ supported: false, installationCount: 0 });
+  expect(await readdir(home)).toEqual([]);
 });

@@ -6,6 +6,7 @@ import { ConnectionSummary } from "./components/StatusSummary.tsx";
 import { StreamersPanel } from "./components/StreamersPanel.tsx";
 import { RocketLeagueHelp } from "./components/RocketLeagueHelp.tsx";
 import { TwitchHelp } from "./components/TwitchHelp.tsx";
+import { SetupSplash } from "./components/SetupSplash.tsx";
 // No DEV mocks in production: do not import DEV_MOCK_SNAPSHOT
 import { buildRosterKey, getScannablePlayerNames } from "./helpers/match.ts";
 import "./styles.css";
@@ -56,6 +57,7 @@ function logRocketLeagueDebug(label, details = {}) {
 }
 
 function App() {
+  const [setupCompleted, setSetupCompleted] = useState<boolean | null>(null);
   const [rocketState, setRocketState] = useState(null);
   const [twitchConnected, setTwitchConnected] = useState(false);
   const [snapshot, setSnapshot] = useState(null);
@@ -70,6 +72,12 @@ function App() {
   const lastRosterKeyRef = useRef("");
   const twitchConnectedRef = useRef(false);
   const scanInFlightRef = useRef(false);
+
+  useEffect(() => {
+    window.rocketLeagueViewer.getSetupCompleted()
+      .then(setSetupCompleted)
+      .catch(() => setSetupCompleted(false));
+  }, []);
 
   const renderSnapshot = useCallback((nextSnapshot) => {
     logRocketLeagueDebug("render snapshot", {
@@ -268,6 +276,32 @@ function App() {
       unsubscribe();
     };
   }, []);
+
+  if (setupCompleted === null) {
+    return <main className="flex min-h-screen items-center justify-center text-slate-400" role="status">Loading RLStreamFinder…</main>;
+  }
+
+  if (!setupCompleted) {
+    return (
+      <main className="mx-auto w-full p-4 text-slate-50">
+        <AuthNotice authFlow={authFlow} />
+        <SetupSplash
+          twitchConnected={twitchConnected}
+          connectingTwitch={connectingTwitch}
+          status={status}
+          onConnectTwitch={connectTwitch}
+          onRocketHelp={() => setShowRocketHelp(true)}
+          onTwitchHelp={() => setShowTwitchHelp(true)}
+          onComplete={async () => {
+            await window.rocketLeagueViewer.completeSetup();
+            setSetupCompleted(true);
+          }}
+        />
+        {showRocketHelp ? <RocketLeagueHelp onClose={() => setShowRocketHelp(false)} /> : null}
+        {showTwitchHelp ? <TwitchHelp onClose={() => setShowTwitchHelp(false)} /> : null}
+      </main>
+    );
+  }
 
   return (
     <main className="mx-auto w-full max-w-[1280px] p-4 text-slate-50">
