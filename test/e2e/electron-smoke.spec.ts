@@ -264,7 +264,7 @@ test("launches Electron, renders the app, exposes preload bridge, and automatica
     await expect(page.getByRole("button", { name: "Verify", exact: true })).toHaveCount(0);
     await expect(page.getByText("Scan new rosters automatically")).toHaveCount(0);
     await expect(page.getByText("playwright-smoke", { exact: true })).toHaveCount(0);
-    await expect(page.getByText("Exact cleaned login match")).toBeVisible();
+    await expect(page.getByText(/Confidence|Exact cleaned login match|Exact login match/)).toHaveCount(0);
     await expect(page.getByText("Live").first()).toBeVisible();
     await expect(page.getByRole("link", { name: /twitch\.tv\/garrettg/i })).toBeVisible();
     await expect(page.getByRole("link", { name: "twitch.tv/coolguy123" })).toBeVisible();

@@ -59,7 +59,6 @@ function StreamerCard({ item, onPreview, onClose }) {
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="truncate text-base font-extrabold">{item.playerName}</h3>
-          <p className="text-sm text-slate-400">{item.reason}</p>
         </div>
         <div className="flex items-center gap-2">
           {twitchStatus.label ? <Pill live={twitchStatus.live}>{twitchStatus.label}</Pill> : null}
@@ -77,7 +76,6 @@ function StreamerCard({ item, onPreview, onClose }) {
         <StreamerStats item={item} />
         {item.isLive && item.title ? <p className="mt-2 text-sm text-slate-50">{item.title}</p> : null}
       </> : null}
-      <p className="mt-1 text-sm text-slate-400">Confidence {item.confidence}</p>
     </article>
   );
 }

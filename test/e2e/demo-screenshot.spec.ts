@@ -52,9 +52,10 @@ test("captures the fixed Musty, TenacityTV, and AlphaKepTV demo", async ({}, tes
           { Name: "Orange", TeamNum: 1 },
         ],
       };
-      for (const channel of ["twitch:verify", "players:check", "rocket-league:connect", "rocket-league:status"]) {
+      for (const channel of ["setup:status", "twitch:verify", "players:check", "rocket-league:connect", "rocket-league:status"]) {
         ipcMain.removeHandler(channel);
       }
+      ipcMain.handle("setup:status", () => true);
       ipcMain.handle("twitch:verify", () => ({ login: "demo-viewer" }));
       ipcMain.handle("players:check", (_event, playerNames) => playerNames.map((playerName) => {
         const result = results[playerName];
