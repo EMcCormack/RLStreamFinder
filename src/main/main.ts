@@ -13,7 +13,7 @@ import {
 import { findDefaultRocketLeagueInstallations, getRocketLeagueSetupAvailability, setupRocketLeagueStats } from "./services/rocket-league-setup";
 import { RocketLeagueConnectionPoller } from "./services/rocket-league-poller";
 import { startWindowsUpdates } from "./services/app-updates";
-import { ensureLinuxDesktopEntry, LINUX_DESKTOP_NAME } from "./services/linux-desktop-entry";
+import { ensureLinuxDesktopEntry, LINUX_DESKTOP_NAME, LINUX_DEV_DESKTOP_NAME } from "./services/linux-desktop-entry";
 import { Channels, type WindowsStartupSettings } from "../shared/ipc-contracts";
 import { equivalentOverlayShortcuts, normalizeOverlayShortcut, validatePanelTransparency, type OverlaySettings } from "../shared/overlay-settings";
 import { completeSetup, getLaunchWithRocketLeague, getOverlayPreferences, getSetupCompleted, setLaunchWithRocketLeague, setOverlayPreferences } from "./services/setup-preferences";
@@ -24,7 +24,7 @@ declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
 const e2eUserDataDir = process.env.RL_STREAM_FINDER_E2E_USER_DATA_DIR;
-if (process.platform === "linux") app.setDesktopName(LINUX_DESKTOP_NAME);
+if (process.platform === "linux") app.setDesktopName(app.isPackaged ? LINUX_DESKTOP_NAME : LINUX_DEV_DESKTOP_NAME);
 if (e2eUserDataDir) {
   app.setPath("userData", e2eUserDataDir);
   app.setPath("sessionData", e2eUserDataDir);
@@ -536,9 +536,13 @@ if (!squirrelStartup && hasSingleInstanceLock) app.whenReady().then(async () => 
     if (!argv.includes("--launch-in-background")) showRegularWindow();
   });
   await configureWindowsStartup();
-  if (process.platform === "linux" && app.isPackaged && !e2eUserDataDir) {
+  if (process.platform === "linux" && !e2eUserDataDir) {
     try {
-      await ensureLinuxDesktopEntry(process.execPath, path.join(process.resourcesPath, "icon.png"));
+      if (app.isPackaged) {
+        await ensureLinuxDesktopEntry(process.execPath, path.join(process.resourcesPath, "icon.png"));
+      } else {
+        await ensureLinuxDesktopEntry(process.execPath, path.join(app.getAppPath(), "assets", "icon.png"), undefined, LINUX_DEV_DESKTOP_NAME, [app.getAppPath()]);
+      }
     } catch (error) {
       console.warn("Could not install Linux desktop entry for global shortcuts:", error);
     }
