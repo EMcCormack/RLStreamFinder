@@ -8,11 +8,15 @@ export type WindowsStartupSettings = {
   enabled: boolean;
 };
 
+export type { OverlaySettings } from "./overlay-settings";
+
 export const Channels = Object.freeze({
   SETUP_STATUS: "setup:status",
   SETUP_COMPLETE: "setup:complete",
   WINDOWS_STARTUP_GET: "windows-startup:get",
   WINDOWS_STARTUP_SET: "windows-startup:set",
+  OVERLAY_SETTINGS_GET: "overlay-settings:get",
+  OVERLAY_SETTINGS_SET: "overlay-settings:set",
   WINDOW_HIDE: "window:hide",
   WINDOW_TOGGLE_OVERLAY: "window:toggle-overlay",
   TWITCH_START_AUTH: "twitch:start-auth",

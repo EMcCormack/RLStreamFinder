@@ -55,7 +55,7 @@ function StreamerCard({ item, onPreview, onClose }) {
   const thumbnailUrl = formatThumbnailUrl(item.thumbnailUrl);
   const twitchStatus = getTwitchLookupStatus(item);
   return (
-    <article className="rounded-md border border-slate-700 bg-slate-700/55 p-3">
+    <article className="adjustable-panel-muted rounded-md border border-slate-700 p-3">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="truncate text-base font-extrabold">{item.playerName}</h3>
@@ -153,7 +153,7 @@ export function StreamersPanel({ results, snapshot, status }) {
   const restore = (item) => setSaved((previous) => ({ ...previous, dismissed: previous.dismissed.filter((key) => key !== streamerKey(item)) }));
 
   return (
-    <aside className="rounded-lg border border-slate-700 bg-slate-900/92 p-4 shadow-2xl">
+    <aside className="adjustable-panel rounded-lg border border-slate-700 p-4 shadow-2xl">
       <div className="mb-4">
         <h2 className="text-lg font-black">Streamers</h2>
         <p className={`text-sm ${status.isError ? "text-rose-300" : "text-slate-400"}`}>{status.message}</p>
@@ -172,7 +172,7 @@ export function StreamersPanel({ results, snapshot, status }) {
         <div className="grid max-h-[22rem] gap-2 overflow-y-auto pr-1" aria-label="Previous streamer list" tabIndex={0}>
           {past.map((item) => {
             const recentStatus = hasRecentStreamStatus(item, now) ? getTwitchLookupStatus(item) : null;
-            return <div key={streamerKey(item)} className="flex min-h-16 items-center justify-between gap-2 rounded-md border border-slate-700 bg-slate-800 p-2 text-sm">
+            return <div key={streamerKey(item)} className="adjustable-panel-secondary flex min-h-16 items-center justify-between gap-2 rounded-md border border-slate-700 p-2 text-sm">
               <div className="min-w-0">
                 <p className="truncate font-bold">{item.playerName}</p>
                 {item.matchedLogin ? <a className="truncate text-sky-300 hover:underline" href={item.url} rel="noreferrer" target="_blank">twitch.tv/{item.matchedLogin}</a> : null}

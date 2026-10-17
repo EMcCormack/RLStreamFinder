@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, expect, test } from "vitest";
-import { completeSetup, getLaunchWithRocketLeague, getSetupCompleted, setLaunchWithRocketLeague } from "../src/main/services/setup-preferences";
+import { completeSetup, getLaunchWithRocketLeague, getOverlayPreferences, getSetupCompleted, setLaunchWithRocketLeague, setOverlayPreferences } from "../src/main/services/setup-preferences";
 
 const directories: string[] = [];
 afterEach(async () => {
@@ -53,4 +53,15 @@ test("treats malformed and old setup preferences as startup disabled", async () 
     await writeFile(path.join(directory, "setup.json"), content);
     expect(await getLaunchWithRocketLeague(directory)).toBe(false);
   }
+});
+
+test("remembers the overlay shortcut and transparency without clearing other preferences", async () => {
+  const directory = await profile();
+  expect(await getOverlayPreferences(directory)).toEqual({ shortcut: "CommandOrControl+Alt+R", panelTransparency: 8 });
+  await setLaunchWithRocketLeague(directory, true);
+  await setOverlayPreferences(directory, "Ctrl+Shift+Y", 35);
+  await completeSetup(directory);
+  expect(await getOverlayPreferences(directory)).toEqual({ shortcut: "Control+Shift+Y", panelTransparency: 35 });
+  expect(await getLaunchWithRocketLeague(directory)).toBe(true);
+  expect(await getSetupCompleted(directory)).toBe(true);
 });

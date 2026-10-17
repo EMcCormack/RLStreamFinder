@@ -19,12 +19,15 @@ export function WindowsStartupSetting({ onBusyChange }: WindowsStartupSettingPro
   }, []);
 
   async function update(enabled: boolean) {
+    const previous = settings;
+    setSettings({ ...settings, enabled });
     setSaving(true);
     onBusyChange?.(true);
     setError("");
     try {
       setSettings(await window.rocketLeagueViewer.setWindowsStartupEnabled(enabled));
     } catch {
+      setSettings(previous);
       setError("Unable to save the Windows startup setting. Please try again.");
     } finally {
       setSaving(false);

@@ -13,8 +13,10 @@ import {
 import { findDefaultRocketLeagueInstallations, getRocketLeagueSetupAvailability, setupRocketLeagueStats } from "./services/rocket-league-setup";
 import { RocketLeagueConnectionPoller } from "./services/rocket-league-poller";
 import { startWindowsUpdates } from "./services/app-updates";
+import { ensureLinuxDesktopEntry, LINUX_DESKTOP_NAME } from "./services/linux-desktop-entry";
 import { Channels, type WindowsStartupSettings } from "../shared/ipc-contracts";
-import { completeSetup, getLaunchWithRocketLeague, getSetupCompleted, setLaunchWithRocketLeague } from "./services/setup-preferences";
+import { normalizeOverlayShortcut, validatePanelTransparency, type OverlaySettings } from "../shared/overlay-settings";
+import { completeSetup, getLaunchWithRocketLeague, getOverlayPreferences, getSetupCompleted, setLaunchWithRocketLeague, setOverlayPreferences } from "./services/setup-preferences";
 import { checkPlayers } from "../shared/pipeline";
 import { TwitchApiError, TwitchAuthRequiredError, TwitchClient } from "./services/twitch";
 
@@ -22,6 +24,7 @@ declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
 const e2eUserDataDir = process.env.RL_STREAM_FINDER_E2E_USER_DATA_DIR;
+if (process.platform === "linux") app.setDesktopName(LINUX_DESKTOP_NAME);
 if (e2eUserDataDir) {
   app.setPath("userData", e2eUserDataDir);
   app.setPath("sessionData", e2eUserDataDir);
@@ -41,7 +44,7 @@ let tray: Tray | null = null;
 let isQuitting = false;
 let isOverlayVisible = false;
 let regularWindowBounds: Electron.Rectangle | null = null;
-const OVERLAY_SHORTCUT = "CommandOrControl+Alt+R";
+let registeredOverlayShortcut: string | null = null;
 const startedInBackground = process.argv.includes("--launch-in-background");
 let quitWhenGameCloses = startedInBackground;
 let rocketLeagueClient = null;
@@ -311,14 +314,47 @@ function createTray() {
     ? path.join(process.resourcesPath, "icon.png")
     : path.join(app.getAppPath(), "assets", "icon.png");
   tray = new Tray(iconPath);
-  tray.setToolTip("RLStreamFinder · Ctrl+Alt+R toggles overlay");
+  updateTrayMenu();
+  tray.on("double-click", showRegularWindow);
+}
+
+function updateTrayMenu() {
+  if (!tray) return;
+  const shortcut = registeredOverlayShortcut ?? "shortcut unavailable";
+  tray.setToolTip(`RLStreamFinder · ${shortcut} toggles overlay`);
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: "Open RLStreamFinder", click: showRegularWindow },
-    { label: "Toggle overlay (Ctrl+Alt+R)", click: toggleOverlay },
+    { label: `Toggle overlay (${shortcut})`, click: toggleOverlay },
     { type: "separator" },
     { label: "Quit", click: () => { isQuitting = true; app.quit(); } },
   ]));
-  tray.on("double-click", showRegularWindow);
+}
+
+async function getOverlaySettings(): Promise<OverlaySettings> {
+  const preferences = await getOverlayPreferences(app.getPath("userData"));
+  return { ...preferences, shortcutActive: registeredOverlayShortcut === preferences.shortcut };
+}
+
+async function setOverlaySettings(shortcut: string, panelTransparency: number): Promise<OverlaySettings> {
+  const normalizedShortcut = normalizeOverlayShortcut(shortcut);
+  validatePanelTransparency(panelTransparency);
+  const previousShortcut = registeredOverlayShortcut;
+  const changedShortcut = normalizedShortcut !== previousShortcut;
+  if (changedShortcut && !globalShortcut.register(normalizedShortcut, toggleOverlay)) {
+    throw new Error("That shortcut is unavailable. Choose another key combination.");
+  }
+  try {
+    await setOverlayPreferences(app.getPath("userData"), normalizedShortcut, panelTransparency);
+  } catch (error) {
+    if (changedShortcut) globalShortcut.unregister(normalizedShortcut);
+    throw error;
+  }
+  if (changedShortcut) {
+    if (previousShortcut) globalShortcut.unregister(previousShortcut);
+    registeredOverlayShortcut = normalizedShortcut;
+    updateTrayMenu();
+  }
+  return { shortcut: normalizedShortcut, shortcutActive: true, panelTransparency };
 }
 
 function stopWhenRocketLeagueCloses() {
@@ -498,17 +534,31 @@ if (!squirrelStartup && hasSingleInstanceLock) app.whenReady().then(async () => 
     if (!argv.includes("--launch-in-background")) showRegularWindow();
   });
   await configureWindowsStartup();
-  createTray();
-  if (!globalShortcut.register(OVERLAY_SHORTCUT, toggleOverlay)) {
-    console.warn(`Unable to register overlay shortcut ${OVERLAY_SHORTCUT}.`);
+  if (process.platform === "linux" && app.isPackaged && !e2eUserDataDir) {
+    try {
+      await ensureLinuxDesktopEntry(process.execPath, path.join(process.resourcesPath, "icon.png"));
+    } catch (error) {
+      console.warn("Could not install Linux desktop entry for global shortcuts:", error);
+    }
   }
-  app.once("will-quit", () => globalShortcut.unregister(OVERLAY_SHORTCUT));
+  const overlayPreferences = await getOverlayPreferences(app.getPath("userData"));
+  if (globalShortcut.register(overlayPreferences.shortcut, toggleOverlay)) {
+    registeredOverlayShortcut = overlayPreferences.shortcut;
+  } else {
+    console.warn(`Unable to register overlay shortcut ${overlayPreferences.shortcut}.`);
+  }
+  createTray();
+  app.once("will-quit", () => {
+    if (registeredOverlayShortcut) globalShortcut.unregister(registeredOverlayShortcut);
+  });
   ipcMain.handle(Channels.WINDOW_HIDE, hideWindow);
   ipcMain.handle(Channels.WINDOW_TOGGLE_OVERLAY, toggleOverlay);
   ipcMain.handle(Channels.SETUP_STATUS, () => getSetupCompleted(app.getPath("userData")));
   ipcMain.handle(Channels.SETUP_COMPLETE, () => completeSetup(app.getPath("userData")));
   ipcMain.handle(Channels.WINDOWS_STARTUP_GET, getWindowsStartupSettings);
   ipcMain.handle(Channels.WINDOWS_STARTUP_SET, (_event, enabled: boolean) => setWindowsStartupEnabled(enabled));
+  ipcMain.handle(Channels.OVERLAY_SETTINGS_GET, getOverlaySettings);
+  ipcMain.handle(Channels.OVERLAY_SETTINGS_SET, (_event, shortcut: string, transparency: number) => setOverlaySettings(shortcut, transparency));
   registerTwitchEmbedHeaderPatch();
   let twitchClient: TwitchClient | null = null;
   function createTwitchClient() {

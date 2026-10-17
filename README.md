@@ -42,6 +42,10 @@ To create a local packaged app instead, run `pnpm package` and open the app in `
 
 On Windows, **Launch with Rocket League** is optional and off by default. Enable it on the first-run screen or later under **Settings**. When enabled, a small watcher starts at Windows sign-in and opens the app when Rocket League starts. Turning it off removes the sign-in entry and stops a watcher already running.
 
+Use the gear button in the upper right to change the global overlay shortcut and panel transparency. The shortcut works on Windows and Linux when the desktop grants global shortcuts. On Linux Wayland, the packaged app installs a desktop entry for its shortcut portal identity; your desktop may also ask for permission to bind the key. Run the app from its final extracted location so the desktop entry points to the correct executable.
+
+![Settings dialog with overlay shortcut and transparency controls](docs/screenshots/settings-modal.png)
+
 ![First launch with connection controls at the top right](docs/screenshots/first-launch.png)
 
 ### Rocket League setup screen

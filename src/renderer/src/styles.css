@@ -39,6 +39,8 @@ header button, header a {
   top: 8px;
   right: 10px;
   z-index: 100;
+  display: flex;
+  gap: 6px;
   -webkit-app-region: no-drag;
 }
 
@@ -50,6 +52,21 @@ header button, header a {
   background: #0f172acc;
   color: #f8fafc;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.adjustable-panel {
+  background-color: rgb(15 23 42 / var(--panel-opacity, .92));
+}
+
+.adjustable-panel-secondary {
+  background-color: rgb(30 41 59 / var(--panel-opacity, .92));
+}
+
+.adjustable-panel-muted {
+  background-color: rgb(51 65 85 / var(--panel-opacity, .92));
 }
 
 button,

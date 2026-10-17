@@ -14,6 +14,12 @@ contextBridge.exposeInMainWorld("rocketLeagueViewer", {
   setWindowsStartupEnabled(enabled: boolean) {
     return ipcRenderer.invoke(Channels.WINDOWS_STARTUP_SET, enabled);
   },
+  getOverlaySettings() {
+    return ipcRenderer.invoke(Channels.OVERLAY_SETTINGS_GET);
+  },
+  setOverlaySettings(shortcut: string, panelTransparency: number) {
+    return ipcRenderer.invoke(Channels.OVERLAY_SETTINGS_SET, shortcut, panelTransparency);
+  },
   hideWindow() {
     return ipcRenderer.invoke(Channels.WINDOW_HIDE);
   },

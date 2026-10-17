@@ -5,7 +5,7 @@ function PlayerRow({ player, result }) {
   const twitchStatus = getTwitchLookupStatus(result);
 
   return (
-    <article className={`flex min-h-16 items-center justify-between gap-3 rounded-md border px-3 py-2.5 ${player.isCurrentPlayer ? "border-teal-300 bg-teal-300/15 shadow-[inset_4px_0_0_#5eead4]" : "border-slate-700 bg-slate-700/55"}`}>
+    <article className={`flex min-h-16 items-center justify-between gap-3 rounded-md border px-3 py-2.5 ${player.isCurrentPlayer ? "border-teal-300 bg-teal-300/15 shadow-[inset_4px_0_0_#5eead4]" : "adjustable-panel-muted border-slate-700"}`}>
       <h4 className="truncate text-sm font-extrabold">{player.isCurrentPlayer ? "You" : player.Name}</h4>
       <div className="flex min-w-[118px] items-center justify-end gap-2 text-right">
         {result?.matchedLogin ? (
@@ -25,7 +25,7 @@ function PlayerRow({ player, result }) {
 
 function TeamColumn({ accent, name, players, results }) {
   return (
-    <section className="min-h-[420px] overflow-hidden rounded-lg border border-slate-700 bg-slate-800">
+    <section className="adjustable-panel-secondary min-h-[420px] overflow-hidden rounded-lg border border-slate-700">
       <header className={`flex h-[54px] items-center border-b border-slate-700 px-4 shadow-[inset_4px_0_0_var(--team-accent)] ${accent}`}>
         <h3 className="text-base font-extrabold">{name}</h3>
       </header>
@@ -56,7 +56,7 @@ export function MatchPanel({ results, snapshot }) {
   const otherPlayers = players.filter((player) => player.TeamNum !== 0 && player.TeamNum !== 1);
 
   return (
-    <section className="rounded-lg border border-slate-700 bg-slate-900/92 p-4 shadow-2xl">
+    <section className="adjustable-panel rounded-lg border border-slate-700 p-4 shadow-2xl">
       <div className="mb-4">
         <h2 className="text-lg font-black">Current Players</h2>
         <p className="text-sm text-slate-400">{snapshot ? "Checking the live roster for Twitch channels." : "Connect to Rocket League to see the live roster."}</p>
