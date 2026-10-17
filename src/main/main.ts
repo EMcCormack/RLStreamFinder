@@ -15,7 +15,7 @@ import { RocketLeagueConnectionPoller } from "./services/rocket-league-poller";
 import { startWindowsUpdates } from "./services/app-updates";
 import { ensureLinuxDesktopEntry, LINUX_DESKTOP_NAME } from "./services/linux-desktop-entry";
 import { Channels, type WindowsStartupSettings } from "../shared/ipc-contracts";
-import { normalizeOverlayShortcut, validatePanelTransparency, type OverlaySettings } from "../shared/overlay-settings";
+import { equivalentOverlayShortcuts, normalizeOverlayShortcut, validatePanelTransparency, type OverlaySettings } from "../shared/overlay-settings";
 import { completeSetup, getLaunchWithRocketLeague, getOverlayPreferences, getSetupCompleted, setLaunchWithRocketLeague, setOverlayPreferences } from "./services/setup-preferences";
 import { checkPlayers } from "../shared/pipeline";
 import { TwitchApiError, TwitchAuthRequiredError, TwitchClient } from "./services/twitch";
@@ -332,29 +332,31 @@ function updateTrayMenu() {
 
 async function getOverlaySettings(): Promise<OverlaySettings> {
   const preferences = await getOverlayPreferences(app.getPath("userData"));
-  return { ...preferences, shortcutActive: registeredOverlayShortcut === preferences.shortcut };
+  return { ...preferences, shortcutActive: Boolean(registeredOverlayShortcut && equivalentOverlayShortcuts(registeredOverlayShortcut, preferences.shortcut, process.platform === "darwin")) };
 }
 
 async function setOverlaySettings(shortcut: string, panelTransparency: number): Promise<OverlaySettings> {
   const normalizedShortcut = normalizeOverlayShortcut(shortcut);
   validatePanelTransparency(panelTransparency);
   const previousShortcut = registeredOverlayShortcut;
-  const changedShortcut = normalizedShortcut !== previousShortcut;
-  if (changedShortcut && !globalShortcut.register(normalizedShortcut, toggleOverlay)) {
+  const effectiveShortcut = previousShortcut && equivalentOverlayShortcuts(previousShortcut, normalizedShortcut, process.platform === "darwin")
+    ? previousShortcut : normalizedShortcut;
+  const changedShortcut = effectiveShortcut !== previousShortcut;
+  if (changedShortcut && !globalShortcut.register(effectiveShortcut, toggleOverlay)) {
     throw new Error("That shortcut is unavailable. Choose another key combination.");
   }
   try {
-    await setOverlayPreferences(app.getPath("userData"), normalizedShortcut, panelTransparency);
+    await setOverlayPreferences(app.getPath("userData"), effectiveShortcut, panelTransparency);
   } catch (error) {
-    if (changedShortcut) globalShortcut.unregister(normalizedShortcut);
+    if (changedShortcut) globalShortcut.unregister(effectiveShortcut);
     throw error;
   }
   if (changedShortcut) {
     if (previousShortcut) globalShortcut.unregister(previousShortcut);
-    registeredOverlayShortcut = normalizedShortcut;
+    registeredOverlayShortcut = effectiveShortcut;
     updateTrayMenu();
   }
-  return { shortcut: normalizedShortcut, shortcutActive: true, panelTransparency };
+  return { shortcut: effectiveShortcut, shortcutActive: true, panelTransparency };
 }
 
 function stopWhenRocketLeagueCloses() {

@@ -202,10 +202,23 @@ test("changes the global shortcut and panel transparency from the settings modal
   try {
     const page = await electronApp.firstWindow();
     await page.getByRole("button", { name: "Open match scanner" }).click();
-    await page.getByRole("button", { name: "Open settings" }).click();
+    const settingsButton = page.getByRole("button", { name: "Open settings" });
+    await expect(settingsButton).toBeVisible();
+    const settingsButtonBounds = await settingsButton.evaluate((button) => {
+      const { x, y, width, height } = button.getBoundingClientRect();
+      return { x, y, width, height };
+    });
+    await page.mouse.click(
+      settingsButtonBounds!.x + settingsButtonBounds!.width / 2,
+      settingsButtonBounds!.y + settingsButtonBounds!.height / 2,
+    );
     const dialog = page.getByRole("dialog", { name: "Settings" });
     await expect(dialog).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath("settings-modal.png") });
+    await dialog.getByLabel("Overlay shortcut").fill("Ctrl+Alt+R");
+    await dialog.getByRole("button", { name: "Save settings" }).click();
+    await expect(dialog).toHaveCount(0);
+    await page.getByRole("button", { name: "Open settings" }).click();
     await dialog.getByLabel("Overlay shortcut").fill("Control+Alt+Y");
     await dialog.getByLabel("Panel transparency").focus();
     await dialog.getByLabel("Panel transparency").press("End");

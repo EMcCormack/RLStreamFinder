@@ -323,7 +323,7 @@ function App() {
     <main className="mx-auto w-full max-w-[1280px] p-4 text-slate-50" style={{ "--panel-opacity": (100 - (overlaySettings?.panelTransparency ?? DEFAULT_PANEL_TRANSPARENCY)) / 100 } as React.CSSProperties}>
       <div className="window-controls"><button type="button" onClick={() => setShowSettings(true)} aria-label="Open settings"><Settings size={16} /></button><button type="button" onClick={() => window.rocketLeagueViewer.hideWindow()} aria-label="Hide RLStreamFinder">×</button></div>
       <header className="adjustable-panel flex min-h-20 flex-wrap items-center justify-between gap-4 rounded-lg border border-slate-700 pb-4 pl-4 pr-20 pt-3">
-        <div>
+        <div className="scanner-drag-region">
           <p className="mb-1 text-xs font-black uppercase text-teal-300">RLStreamFinder</p>
           <h1 className="text-3xl font-black tracking-normal">Live Match Scanner</h1>
           <p className="text-xs text-slate-400">{shortcutLabel} toggles overlay</p>

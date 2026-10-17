@@ -22,15 +22,16 @@ html, #root {
 }
 
 header {
-  -webkit-app-region: drag;
+  -webkit-app-region: no-drag;
 }
 
-header button, header a {
-  -webkit-app-region: no-drag;
+.scanner-drag-region {
+  -webkit-app-region: drag;
 }
 
 .window-titlebar {
   min-height: 32px;
+  width: calc(100% - 90px);
   -webkit-app-region: drag;
 }
 
@@ -45,8 +46,8 @@ header button, header a {
 }
 
 .window-controls button {
-  width: 28px;
-  height: 28px;
+  width: 36px;
+  height: 36px;
   border: 1px solid #475569;
   border-radius: 6px;
   background: #0f172acc;
@@ -55,6 +56,7 @@ header button, header a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  -webkit-app-region: no-drag;
 }
 
 .adjustable-panel {

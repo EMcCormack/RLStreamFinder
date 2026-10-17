@@ -45,3 +45,8 @@ export function validatePanelTransparency(value: number): number {
   }
   return value;
 }
+
+export function equivalentOverlayShortcuts(first: string, second: string, onMac: boolean): boolean {
+  const platformModifier = onMac ? "Meta" : "Control";
+  return first.replace("CommandOrControl", platformModifier) === second.replace("CommandOrControl", platformModifier);
+}
