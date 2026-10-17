@@ -11,8 +11,8 @@
   },
   "main": ".vite/build/main.js",
   "scripts": {
-    "start": "electron-forge start",
-    "dev": "electron-forge start",
+    "start": "node ./scripts/start.mjs",
+    "dev": "node ./scripts/start.mjs",
     "twitch:debug": "pnpm build && electron . --twitch-debug",
     "package": "electron-forge package",
     "make": "electron-forge make",

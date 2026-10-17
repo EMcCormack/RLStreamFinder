@@ -26,7 +26,8 @@ declare const MAIN_WINDOW_VITE_NAME: string;
 
 const e2eUserDataDir = process.env.RL_STREAM_FINDER_E2E_USER_DATA_DIR;
 const kdeWayland = isKdeWayland() && !e2eUserDataDir;
-const relaunchForKde = kdeWayland && !process.argv.includes("--ozone-platform=x11");
+const usingXWayland = process.argv.includes("--ozone-platform=x11");
+const relaunchForKde = kdeWayland && app.isPackaged && !usingXWayland;
 if (relaunchForKde) {
   app.relaunch({ args: [...process.argv.slice(1), "--ozone-platform=x11"] });
   app.quit();
@@ -257,7 +258,7 @@ function toggleOverlay() {
   });
   mainWindow.setAlwaysOnTop(true, "screen-saver");
   // Native Wayland cannot show this Electron window without activating it.
-  if (process.platform === "linux" && process.env.XDG_SESSION_TYPE === "wayland" && !kdeWayland) {
+  if (process.platform === "linux" && process.env.XDG_SESSION_TYPE === "wayland" && !usingXWayland) {
     mainWindow.show();
     mainWindow.focus();
   } else {
