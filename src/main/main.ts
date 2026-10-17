@@ -1,5 +1,6 @@
 import path from "node:path";
 import { existsSync } from "node:fs";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { app, autoUpdater, BrowserWindow, dialog, globalShortcut, ipcMain, safeStorage, screen, session, shell, Tray, Menu } from "electron";
 import squirrelStartup from "electron-squirrel-startup";
@@ -255,6 +256,21 @@ function windowsBootstrapPath(): string | null {
   return existsSync(bootstrapExe) ? bootstrapExe : null;
 }
 
+function windowsBootstrapMarkerPath(): string {
+  return path.join(app.getPath("userData"), "launch-with-rocket-league.enabled");
+}
+
+async function applyWindowsStartup(enabled: boolean, bootstrapExe: string): Promise<void> {
+  const markerPath = windowsBootstrapMarkerPath();
+  if (enabled) {
+    await mkdir(path.dirname(markerPath), { recursive: true });
+    await writeFile(markerPath, "", "utf8");
+  } else {
+    await rm(markerPath, { force: true });
+  }
+  app.setLoginItemSettings({ openAtLogin: enabled, path: bootstrapExe, args: [markerPath] });
+}
+
 async function getWindowsStartupSettings(): Promise<WindowsStartupSettings> {
   const supported = windowsBootstrapPath() !== null;
   return { supported, enabled: supported && await getLaunchWithRocketLeague(app.getPath("userData")) };
@@ -265,11 +281,15 @@ async function setWindowsStartupEnabled(enabled: boolean): Promise<WindowsStartu
   const bootstrapExe = windowsBootstrapPath();
   if (!bootstrapExe) throw new Error("Windows startup is unavailable in this build.");
   const previous = await getLaunchWithRocketLeague(app.getPath("userData"));
-  app.setLoginItemSettings({ openAtLogin: enabled, path: bootstrapExe });
   try {
+    await applyWindowsStartup(enabled, bootstrapExe);
     await setLaunchWithRocketLeague(app.getPath("userData"), enabled);
   } catch (error) {
-    app.setLoginItemSettings({ openAtLogin: previous, path: bootstrapExe });
+    try {
+      await applyWindowsStartup(previous, bootstrapExe);
+    } catch (rollbackError) {
+      console.warn("Could not restore Windows sign-in launch setting:", rollbackError);
+    }
     throw error;
   }
   return { supported: true, enabled };
@@ -279,10 +299,7 @@ async function configureWindowsStartup() {
   const bootstrapExe = windowsBootstrapPath();
   if (!bootstrapExe) return;
   try {
-    app.setLoginItemSettings({
-      openAtLogin: await getLaunchWithRocketLeague(app.getPath("userData")),
-      path: bootstrapExe,
-    });
+    await applyWindowsStartup(await getLaunchWithRocketLeague(app.getPath("userData")), bootstrapExe);
   } catch (error) {
     console.warn("Could not apply Windows sign-in launch setting:", error);
   }

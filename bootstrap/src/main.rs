@@ -5,6 +5,7 @@ mod windows {
     use std::ffi::c_void;
     use std::mem::size_of;
     use std::os::windows::process::CommandExt;
+    use std::path::PathBuf;
     use std::process::Command;
     use std::thread;
     use std::time::Duration;
@@ -78,6 +79,9 @@ mod windows {
     }
 
     pub fn run() {
+        let Some(marker_path) = std::env::args_os().nth(1).map(PathBuf::from) else {
+            return;
+        };
         let Ok(bootstrap_path) = std::env::current_exe() else {
             return;
         };
@@ -92,7 +96,7 @@ mod windows {
         let mut was_running = false;
 
         loop {
-            if !update_exe.exists() {
+            if !marker_path.exists() || !update_exe.exists() {
                 return;
             }
             if let Some(running) = rocket_league_running() {
