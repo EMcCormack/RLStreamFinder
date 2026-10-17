@@ -9,4 +9,5 @@ src/renderer/.vite/
 out/
 playwright-report/
 test-results/
+bootstrap/target/
 eng.traineddata

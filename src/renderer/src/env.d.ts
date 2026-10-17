@@ -7,6 +7,8 @@ declare global {
     rocketLeagueViewer: {
       getSetupCompleted: () => Promise<boolean>;
       completeSetup: () => Promise<void>;
+      hideWindow: () => Promise<void>;
+      toggleOverlay: () => Promise<void>;
       startTwitchAuth: () => Promise<any>;
       completeTwitchAuth: (flow: any) => Promise<any>;
       verifyTwitch: () => Promise<any>;

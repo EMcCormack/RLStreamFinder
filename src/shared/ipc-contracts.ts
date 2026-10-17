@@ -6,6 +6,8 @@ export type RocketLeagueSetupAvailability = {
 export const Channels = Object.freeze({
   SETUP_STATUS: "setup:status",
   SETUP_COMPLETE: "setup:complete",
+  WINDOW_HIDE: "window:hide",
+  WINDOW_TOGGLE_OVERLAY: "window:toggle-overlay",
   TWITCH_START_AUTH: "twitch:start-auth",
   TWITCH_COMPLETE_AUTH: "twitch:complete-auth",
   TWITCH_VERIFY: "twitch:verify",

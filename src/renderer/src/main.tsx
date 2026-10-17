@@ -284,6 +284,8 @@ function App() {
   if (!setupCompleted) {
     return (
       <main className="mx-auto w-full p-4 text-slate-50">
+        <div className="window-titlebar" aria-hidden="true">RLStreamFinder</div>
+        <div className="window-controls"><button type="button" onClick={() => window.rocketLeagueViewer.hideWindow()} aria-label="Hide RLStreamFinder">×</button></div>
         <AuthNotice authFlow={authFlow} />
         <SetupSplash
           twitchConnected={twitchConnected}
@@ -305,10 +307,12 @@ function App() {
 
   return (
     <main className="mx-auto w-full max-w-[1280px] p-4 text-slate-50">
-      <header className="flex min-h-20 flex-wrap items-center justify-between gap-4 pb-4 pt-3">
+      <div className="window-controls"><button type="button" onClick={() => window.rocketLeagueViewer.hideWindow()} aria-label="Hide RLStreamFinder">×</button></div>
+      <header className="flex min-h-20 flex-wrap items-center justify-between gap-4 rounded-lg bg-slate-900/90 px-4 pb-4 pt-3">
         <div>
           <p className="mb-1 text-xs font-black uppercase text-teal-300">RLStreamFinder</p>
           <h1 className="text-3xl font-black tracking-normal">Live Match Scanner</h1>
+          <p className="text-xs text-slate-400">Ctrl+Alt+R toggles overlay</p>
         </div>
       <ConnectionSummary
         rocketState={rocketState}

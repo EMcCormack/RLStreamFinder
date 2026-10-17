@@ -1,6 +1,21 @@
 import { test, expect } from "@playwright/test";
 import { launchTestElectron } from "./launch-electron";
 
+test("uses a transparent window and toggles the overlay above other windows", async ({}, testInfo) => {
+  const electronApp = await launchTestElectron(testInfo);
+  try {
+    const page = await electronApp.firstWindow();
+    expect(await electronApp.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isAlwaysOnTop())).toBe(false);
+    expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
+    await page.evaluate(() => window.rocketLeagueViewer.toggleOverlay());
+    expect(await electronApp.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isAlwaysOnTop())).toBe(true);
+    await page.evaluate(() => window.rocketLeagueViewer.toggleOverlay());
+    expect(await electronApp.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible())).toBe(false);
+  } finally {
+    await electronApp.close();
+  }
+});
+
 async function installSmokeIpcMocks(electronApp, identitySource = "explicit", skipSetup = true) {
   if (skipSetup) {
     await electronApp.evaluate(({ ipcMain }) => {
@@ -237,6 +252,8 @@ test("launches Electron, renders the app, exposes preload bridge, and automatica
         getRocketLeagueStatus: typeof bridge?.getRocketLeagueStatus,
         loadRocketLeaguePlayers: typeof bridge?.loadRocketLeaguePlayers,
         onRocketLeagueUpdate: typeof bridge?.onRocketLeagueUpdate,
+        hideWindow: typeof bridge?.hideWindow,
+        toggleOverlay: typeof bridge?.toggleOverlay,
       };
     });
 
@@ -252,6 +269,8 @@ test("launches Electron, renders the app, exposes preload bridge, and automatica
       getRocketLeagueStatus: "function",
       loadRocketLeaguePlayers: "function",
       onRocketLeagueUpdate: "function",
+      hideWindow: "function",
+      toggleOverlay: "function",
     });
 
     await expect(page.getByText("GarrettG_TTV").first()).toBeVisible();

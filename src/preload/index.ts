@@ -8,6 +8,12 @@ contextBridge.exposeInMainWorld("rocketLeagueViewer", {
   completeSetup() {
     return ipcRenderer.invoke(Channels.SETUP_COMPLETE);
   },
+  hideWindow() {
+    return ipcRenderer.invoke(Channels.WINDOW_HIDE);
+  },
+  toggleOverlay() {
+    return ipcRenderer.invoke(Channels.WINDOW_TOGGLE_OVERLAY);
+  },
   startTwitchAuth() {
     return ipcRenderer.invoke(Channels.TWITCH_START_AUTH);
   },

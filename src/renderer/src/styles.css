@@ -11,9 +11,45 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: #111317;
+  background: transparent;
   color: #f8fafc;
   font-family: var(--font-sans);
+}
+
+html, #root {
+  min-height: 100%;
+  background: transparent;
+}
+
+header {
+  -webkit-app-region: drag;
+}
+
+header button, header a {
+  -webkit-app-region: no-drag;
+}
+
+.window-titlebar {
+  min-height: 32px;
+  -webkit-app-region: drag;
+}
+
+.window-controls {
+  position: fixed;
+  top: 8px;
+  right: 10px;
+  z-index: 100;
+  -webkit-app-region: no-drag;
+}
+
+.window-controls button {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  background: #0f172acc;
+  color: #f8fafc;
+  cursor: pointer;
 }
 
 button,

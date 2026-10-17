@@ -1,5 +1,7 @@
 import path from "node:path";
-import { app, autoUpdater, BrowserWindow, dialog, ipcMain, safeStorage, session, shell } from "electron";
+import { existsSync } from "node:fs";
+import { execFile } from "node:child_process";
+import { app, autoUpdater, BrowserWindow, dialog, globalShortcut, ipcMain, safeStorage, screen, session, shell, Tray, Menu } from "electron";
 import squirrelStartup from "electron-squirrel-startup";
 import { TWITCH_CLIENT_ID, TWITCH_SCOPES } from "./services/app-config";
 import {
@@ -28,7 +30,19 @@ if (squirrelStartup) {
   app.quit();
 }
 
+const hasSingleInstanceLock = squirrelStartup || app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) {
+  app.quit();
+}
+
 let mainWindow = null;
+let tray: Tray | null = null;
+let isQuitting = false;
+let isOverlayVisible = false;
+let regularWindowBounds: Electron.Rectangle | null = null;
+const OVERLAY_SHORTCUT = "CommandOrControl+Alt+R";
+const startedInBackground = process.argv.includes("--launch-in-background");
+let quitWhenGameCloses = startedInBackground;
 let rocketLeagueClient = null;
 let rocketLeaguePoller: RocketLeagueConnectionPoller | null = null;
 let latestRocketLeagueSnapshot = null;
@@ -132,7 +146,9 @@ function createMainWindow() {
     height: 820,
     minWidth: 980,
     minHeight: 620,
-    backgroundColor: "#111317",
+    transparent: true,
+    frame: false,
+    show: !startedInBackground,
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,
@@ -141,6 +157,13 @@ function createMainWindow() {
     icon: iconPath,
   });
   mainWindow.removeMenu();
+  mainWindow.on("close", (event) => {
+    if (process.platform === "win32" && !isQuitting) {
+      event.preventDefault();
+      hideWindow();
+    }
+  });
+  mainWindow.on("closed", () => { mainWindow = null; });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//i.test(url)) {
@@ -181,6 +204,95 @@ function createMainWindow() {
   } else {
     mainWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
   }
+}
+
+function hideWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.hide();
+  mainWindow.setAlwaysOnTop(false);
+  isOverlayVisible = false;
+}
+
+function showRegularWindow() {
+  quitWhenGameCloses = false;
+  if (!mainWindow || mainWindow.isDestroyed()) createMainWindow();
+  mainWindow.setAlwaysOnTop(false);
+  if (regularWindowBounds) mainWindow.setBounds(regularWindowBounds);
+  isOverlayVisible = false;
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+function toggleOverlay() {
+  if (!mainWindow || mainWindow.isDestroyed()) createMainWindow();
+  if (isOverlayVisible && mainWindow.isVisible()) {
+    hideWindow();
+    return;
+  }
+
+  const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+  if (!isOverlayVisible && (mainWindow.isVisible() || !regularWindowBounds)) {
+    regularWindowBounds = mainWindow.getBounds();
+  }
+  const { x, y, width, height } = display.workArea;
+  const overlayWidth = Math.min(1100, width);
+  const overlayHeight = Math.min(720, height);
+  mainWindow.setBounds({
+    x: x + width - overlayWidth,
+    y,
+    width: overlayWidth,
+    height: overlayHeight,
+  });
+  mainWindow.setAlwaysOnTop(true, "screen-saver");
+  mainWindow.show();
+  mainWindow.focus();
+  isOverlayVisible = true;
+}
+
+function configureWindowsStartup() {
+  if (process.platform !== "win32" || !app.isPackaged || e2eUserDataDir) return;
+
+  const bootstrapExe = path.join(process.resourcesPath, "rl-stream-finder-bootstrap.exe");
+  if (!existsSync(bootstrapExe)) return;
+  try {
+    app.setLoginItemSettings({
+      openAtLogin: true,
+      path: bootstrapExe,
+    });
+  } catch (error) {
+    console.warn("Could not enable Windows sign-in launch:", error);
+  }
+}
+
+function createTray() {
+  if (process.platform !== "win32") return;
+  const iconPath = app.isPackaged
+    ? path.join(process.resourcesPath, "icon.png")
+    : path.join(app.getAppPath(), "assets", "icon.png");
+  tray = new Tray(iconPath);
+  tray.setToolTip("RLStreamFinder · Ctrl+Alt+R toggles overlay");
+  tray.setContextMenu(Menu.buildFromTemplate([
+    { label: "Open RLStreamFinder", click: showRegularWindow },
+    { label: "Toggle overlay (Ctrl+Alt+R)", click: toggleOverlay },
+    { type: "separator" },
+    { label: "Quit", click: () => { isQuitting = true; app.quit(); } },
+  ]));
+  tray.on("double-click", showRegularWindow);
+}
+
+function stopWhenRocketLeagueCloses() {
+  if (process.platform !== "win32" || !startedInBackground) return;
+  const timer = setInterval(() => {
+    if (!quitWhenGameCloses || isQuitting) return;
+    execFile("tasklist", ["/FI", "IMAGENAME eq RocketLeague.exe", "/FO", "CSV", "/NH"],
+      { windowsHide: true }, (error, stdout) => {
+        if (!error && !/^"RocketLeague\.exe",/im.test(stdout) && quitWhenGameCloses) {
+          isQuitting = true;
+          app.quit();
+        }
+      });
+  }, 10000);
+  app.once("before-quit", () => clearInterval(timer));
 }
 
 function sendRocketLeagueSnapshot(snapshot) {
@@ -340,7 +452,18 @@ function createTokenCodec() {
   };
 }
 
-if (!squirrelStartup) app.whenReady().then(() => {
+if (!squirrelStartup && hasSingleInstanceLock) app.whenReady().then(() => {
+  app.on("second-instance", (_event, argv) => {
+    if (!argv.includes("--launch-in-background")) showRegularWindow();
+  });
+  configureWindowsStartup();
+  createTray();
+  if (!globalShortcut.register(OVERLAY_SHORTCUT, toggleOverlay)) {
+    console.warn(`Unable to register overlay shortcut ${OVERLAY_SHORTCUT}.`);
+  }
+  app.once("will-quit", () => globalShortcut.unregister(OVERLAY_SHORTCUT));
+  ipcMain.handle(Channels.WINDOW_HIDE, hideWindow);
+  ipcMain.handle(Channels.WINDOW_TOGGLE_OVERLAY, toggleOverlay);
   ipcMain.handle(Channels.SETUP_STATUS, () => getSetupCompleted(app.getPath("userData")));
   ipcMain.handle(Channels.SETUP_COMPLETE, () => completeSetup(app.getPath("userData")));
   registerTwitchEmbedHeaderPatch();
@@ -531,6 +654,7 @@ if (!squirrelStartup) app.whenReady().then(() => {
   });
 
   createMainWindow();
+  stopWhenRocketLeagueCloses();
 
   const stopUpdates = startWindowsUpdates({
     isPackaged: app.isPackaged,
@@ -542,6 +666,8 @@ if (!squirrelStartup) app.whenReady().then(() => {
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createMainWindow();
+    } else {
+      showRegularWindow();
     }
   });
 });

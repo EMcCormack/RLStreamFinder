@@ -13,7 +13,7 @@ The workflow must be run from an existing version tag and rejects branch selecti
 
 ## Local build commands
 
-Run `pnpm install --frozen-lockfile` first. On Windows, use `pnpm make:windows`. On Linux, use `pnpm make:linux:zip`. Outputs are under `out/make/`. `pnpm package` creates an unpacked app for a quick local check.
+Run `pnpm install --frozen-lockfile` first. Windows builds also need the stable Rust toolchain; Forge compiles the startup watcher during packaging. On Windows, use `pnpm make:windows`. On Linux, use `pnpm make:linux:zip`. Outputs are under `out/make/`. `pnpm package` creates an unpacked app for a quick local check.
 
 Windows builds are currently unsigned. Treat the first binaries as a preview and complete signing before a broad stable release.
 
