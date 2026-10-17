@@ -166,6 +166,37 @@ test("guides first launch through setup and remembers completion after restartin
   }
 });
 
+test("offers opt-in Windows startup on first launch and in scanner settings", async ({}, testInfo) => {
+  const electronApp = await launchTestElectron(testInfo);
+  try {
+    await electronApp.evaluate(({ ipcMain }) => {
+      let enabled = false;
+      ipcMain.removeHandler("windows-startup:get");
+      ipcMain.handle("windows-startup:get", () => ({ supported: true, enabled }));
+      ipcMain.removeHandler("windows-startup:set");
+      ipcMain.handle("windows-startup:set", (_event, value) => {
+        enabled = value;
+        return { supported: true, enabled };
+      });
+    });
+    const page = await electronApp.firstWindow();
+    await page.reload({ waitUntil: "domcontentloaded" });
+    const firstRunSetting = page.getByRole("checkbox", { name: /Launch with Rocket League/ });
+    await expect(firstRunSetting).not.toBeChecked();
+    await firstRunSetting.check();
+    await expect(firstRunSetting).toBeChecked();
+    await page.getByRole("button", { name: "Open match scanner" }).click();
+    await page.getByText("Settings", { exact: true }).click();
+    await expect(page.getByRole("checkbox", { name: /Launch with Rocket League/ })).toBeChecked();
+    await page.getByRole("checkbox", { name: /Launch with Rocket League/ }).uncheck();
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.getByText("Settings", { exact: true }).click();
+    await expect(page.getByRole("checkbox", { name: /Launch with Rocket League/ })).not.toBeChecked();
+  } finally {
+    await electronApp.close();
+  }
+});
+
 test("adapts setup to missing installations, unsupported platforms, and detection failures", async ({}, testInfo) => {
   const electronApp = await launchTestElectron(testInfo);
   try {

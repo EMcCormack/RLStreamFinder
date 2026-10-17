@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, expect, test } from "vitest";
-import { completeSetup, getSetupCompleted } from "../src/main/services/setup-preferences";
+import { completeSetup, getLaunchWithRocketLeague, getSetupCompleted, setLaunchWithRocketLeague } from "../src/main/services/setup-preferences";
 
 const directories: string[] = [];
 afterEach(async () => {
@@ -31,4 +31,26 @@ test("requires explicit completion and recovers from malformed preferences", asy
   }
   await completeSetup(directory);
   expect(await getSetupCompleted(directory)).toBe(true);
+});
+
+test("keeps Windows startup off until enabled and preserves it through setup completion", async () => {
+  const directory = await profile();
+  expect(await getLaunchWithRocketLeague(directory)).toBe(false);
+  await completeSetup(directory);
+  expect(await getLaunchWithRocketLeague(directory)).toBe(false);
+  await setLaunchWithRocketLeague(directory, true);
+  expect(await getLaunchWithRocketLeague(directory)).toBe(true);
+  await completeSetup(directory);
+  expect(JSON.parse(await readFile(path.join(directory, "setup.json"), "utf8"))).toEqual({ completed: true, launchWithRocketLeague: true });
+  await setLaunchWithRocketLeague(directory, false);
+  expect(await getSetupCompleted(directory)).toBe(true);
+  expect(await getLaunchWithRocketLeague(directory)).toBe(false);
+});
+
+test("treats malformed and old setup preferences as startup disabled", async () => {
+  const directory = await profile();
+  for (const content of ["broken json", "null", '{"completed":true}', '{"launchWithRocketLeague":"true"}']) {
+    await writeFile(path.join(directory, "setup.json"), content);
+    expect(await getLaunchWithRocketLeague(directory)).toBe(false);
+  }
 });

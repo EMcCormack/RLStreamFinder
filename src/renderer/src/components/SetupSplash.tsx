@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Gamepad2, Radio, Check } from "lucide-react";
 import { ActionButton } from "./ui.tsx";
 import type { RocketLeagueSetupAvailability } from "../../../shared/ipc-contracts";
+import { WindowsStartupSetting } from "./WindowsStartupSetting.tsx";
 
 type SetupSplashProps = {
   twitchConnected: boolean;
@@ -22,7 +23,8 @@ export function SetupSplash({ twitchConnected, connectingTwitch, status, onConne
   const [result, setResult] = useState<{ message: string; isError: boolean } | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
-  const busy = settingUp || connectingTwitch || saving;
+  const [savingStartup, setSavingStartup] = useState(false);
+  const busy = settingUp || connectingTwitch || saving || savingStartup;
 
   useEffect(() => {
     let active = true;
@@ -96,6 +98,10 @@ export function SetupSplash({ twitchConnected, connectingTwitch, status, onConne
           <button type="button" onClick={onTwitchHelp} className="mt-4 block text-sm text-sky-300 hover:underline">Why connect Twitch?</button>
         </section>
       </div>
+      <section className="mt-4 rounded-xl border border-slate-700 bg-slate-900 p-6" aria-label="Startup settings">
+        <h2 className="mb-3 text-xl font-bold">Startup settings</h2>
+        <WindowsStartupSetting onBusyChange={setSavingStartup} />
+      </section>
       {status.message !== "Ready." ? <p role="status" className={`mt-4 text-sm ${status.isError ? "text-rose-300" : "text-slate-400"}`}>{status.message}</p> : null}
       <div className="mt-8 flex flex-wrap items-center gap-4">
         <ActionButton onClick={finish} disabled={busy}>{saving ? "Saving…" : "Open match scanner"}</ActionButton>

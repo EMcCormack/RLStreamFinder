@@ -8,6 +8,12 @@ contextBridge.exposeInMainWorld("rocketLeagueViewer", {
   completeSetup() {
     return ipcRenderer.invoke(Channels.SETUP_COMPLETE);
   },
+  getWindowsStartupSettings() {
+    return ipcRenderer.invoke(Channels.WINDOWS_STARTUP_GET);
+  },
+  setWindowsStartupEnabled(enabled: boolean) {
+    return ipcRenderer.invoke(Channels.WINDOWS_STARTUP_SET, enabled);
+  },
   hideWindow() {
     return ipcRenderer.invoke(Channels.WINDOW_HIDE);
   },

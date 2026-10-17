@@ -12,8 +12,8 @@ import {
 import { findDefaultRocketLeagueInstallations, getRocketLeagueSetupAvailability, setupRocketLeagueStats } from "./services/rocket-league-setup";
 import { RocketLeagueConnectionPoller } from "./services/rocket-league-poller";
 import { startWindowsUpdates } from "./services/app-updates";
-import { Channels } from "../shared/ipc-contracts";
-import { completeSetup, getSetupCompleted } from "./services/setup-preferences";
+import { Channels, type WindowsStartupSettings } from "../shared/ipc-contracts";
+import { completeSetup, getLaunchWithRocketLeague, getSetupCompleted, setLaunchWithRocketLeague } from "./services/setup-preferences";
 import { checkPlayers } from "../shared/pipeline";
 import { TwitchApiError, TwitchAuthRequiredError, TwitchClient } from "./services/twitch";
 
@@ -249,18 +249,42 @@ function toggleOverlay() {
   isOverlayVisible = true;
 }
 
-function configureWindowsStartup() {
-  if (process.platform !== "win32" || !app.isPackaged || e2eUserDataDir) return;
-
+function windowsBootstrapPath(): string | null {
+  if (process.platform !== "win32" || !app.isPackaged || e2eUserDataDir) return null;
   const bootstrapExe = path.join(process.resourcesPath, "rl-stream-finder-bootstrap.exe");
-  if (!existsSync(bootstrapExe)) return;
+  return existsSync(bootstrapExe) ? bootstrapExe : null;
+}
+
+async function getWindowsStartupSettings(): Promise<WindowsStartupSettings> {
+  const supported = windowsBootstrapPath() !== null;
+  return { supported, enabled: supported && await getLaunchWithRocketLeague(app.getPath("userData")) };
+}
+
+async function setWindowsStartupEnabled(enabled: boolean): Promise<WindowsStartupSettings> {
+  if (typeof enabled !== "boolean") throw new TypeError("Startup setting must be a boolean.");
+  const bootstrapExe = windowsBootstrapPath();
+  if (!bootstrapExe) throw new Error("Windows startup is unavailable in this build.");
+  const previous = await getLaunchWithRocketLeague(app.getPath("userData"));
+  app.setLoginItemSettings({ openAtLogin: enabled, path: bootstrapExe });
+  try {
+    await setLaunchWithRocketLeague(app.getPath("userData"), enabled);
+  } catch (error) {
+    app.setLoginItemSettings({ openAtLogin: previous, path: bootstrapExe });
+    throw error;
+  }
+  return { supported: true, enabled };
+}
+
+async function configureWindowsStartup() {
+  const bootstrapExe = windowsBootstrapPath();
+  if (!bootstrapExe) return;
   try {
     app.setLoginItemSettings({
-      openAtLogin: true,
+      openAtLogin: await getLaunchWithRocketLeague(app.getPath("userData")),
       path: bootstrapExe,
     });
   } catch (error) {
-    console.warn("Could not enable Windows sign-in launch:", error);
+    console.warn("Could not apply Windows sign-in launch setting:", error);
   }
 }
 
@@ -452,11 +476,11 @@ function createTokenCodec() {
   };
 }
 
-if (!squirrelStartup && hasSingleInstanceLock) app.whenReady().then(() => {
+if (!squirrelStartup && hasSingleInstanceLock) app.whenReady().then(async () => {
   app.on("second-instance", (_event, argv) => {
     if (!argv.includes("--launch-in-background")) showRegularWindow();
   });
-  configureWindowsStartup();
+  await configureWindowsStartup();
   createTray();
   if (!globalShortcut.register(OVERLAY_SHORTCUT, toggleOverlay)) {
     console.warn(`Unable to register overlay shortcut ${OVERLAY_SHORTCUT}.`);
@@ -466,6 +490,8 @@ if (!squirrelStartup && hasSingleInstanceLock) app.whenReady().then(() => {
   ipcMain.handle(Channels.WINDOW_TOGGLE_OVERLAY, toggleOverlay);
   ipcMain.handle(Channels.SETUP_STATUS, () => getSetupCompleted(app.getPath("userData")));
   ipcMain.handle(Channels.SETUP_COMPLETE, () => completeSetup(app.getPath("userData")));
+  ipcMain.handle(Channels.WINDOWS_STARTUP_GET, getWindowsStartupSettings);
+  ipcMain.handle(Channels.WINDOWS_STARTUP_SET, (_event, enabled: boolean) => setWindowsStartupEnabled(enabled));
   registerTwitchEmbedHeaderPatch();
   let twitchClient: TwitchClient | null = null;
   function createTwitchClient() {

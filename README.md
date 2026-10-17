@@ -40,6 +40,8 @@ To create a local packaged app instead, run `pnpm package` and open the app in `
 2. **Connect Rocket League.** Restart the game, join a live match, and click **Connect RL**. The roster only appears while Rocket League is sending live match data.
 3. **Connect Twitch.** Click **Connect Twitch** and enter the displayed code on the Twitch page opened in your browser. The app does not ask for your Twitch password or extra permissions. Click the Twitch **?** for an explanation in the app.
 
+On Windows, **Launch with Rocket League** is optional and off by default. Enable it on the first-run screen or later under **Settings**. When enabled, a small watcher starts at Windows sign-in and opens the app when Rocket League starts. Turning it off removes the sign-in entry.
+
 ![First launch with connection controls at the top right](docs/screenshots/first-launch.png)
 
 ### Rocket League setup screen

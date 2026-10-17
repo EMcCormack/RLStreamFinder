@@ -7,6 +7,7 @@ import { StreamersPanel } from "./components/StreamersPanel.tsx";
 import { RocketLeagueHelp } from "./components/RocketLeagueHelp.tsx";
 import { TwitchHelp } from "./components/TwitchHelp.tsx";
 import { SetupSplash } from "./components/SetupSplash.tsx";
+import { WindowsStartupSetting } from "./components/WindowsStartupSetting.tsx";
 // No DEV mocks in production: do not import DEV_MOCK_SNAPSHOT
 import { buildRosterKey, getScannablePlayerNames } from "./helpers/match.ts";
 import "./styles.css";
@@ -327,6 +328,11 @@ function App() {
       </header>
 
       <AuthNotice authFlow={authFlow} />
+
+      <details className="mb-3 rounded-lg border border-slate-700 bg-slate-900/90 p-4">
+        <summary className="cursor-pointer font-semibold">Settings</summary>
+        <div className="mt-4"><WindowsStartupSetting /></div>
+      </details>
 
       <section className="grid grid-cols-[minmax(0,1fr)_460px] items-start gap-3 max-lg:grid-cols-1">
         <MatchPanel
