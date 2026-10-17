@@ -14,6 +14,7 @@ import { findDefaultRocketLeagueInstallations, getRocketLeagueSetupAvailability,
 import { RocketLeagueConnectionPoller } from "./services/rocket-league-poller";
 import { startWindowsUpdates } from "./services/app-updates";
 import { ensureLinuxDesktopEntry, LINUX_DESKTOP_NAME, LINUX_DEV_DESKTOP_NAME } from "./services/linux-desktop-entry";
+import { isKdeWayland, KdeShortcutPortal } from "./services/kde-shortcut-portal";
 import { Channels, type WindowsStartupSettings } from "../shared/ipc-contracts";
 import { equivalentOverlayShortcuts, normalizeOverlayShortcut, validatePanelTransparency, type OverlaySettings } from "../shared/overlay-settings";
 import { completeSetup, getLaunchWithRocketLeague, getOverlayPreferences, getSetupCompleted, setLaunchWithRocketLeague, setOverlayPreferences } from "./services/setup-preferences";
@@ -24,6 +25,12 @@ declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
 const e2eUserDataDir = process.env.RL_STREAM_FINDER_E2E_USER_DATA_DIR;
+const kdeWayland = isKdeWayland() && !e2eUserDataDir;
+const relaunchForKde = kdeWayland && !process.argv.includes("--ozone-platform=x11");
+if (relaunchForKde) {
+  app.relaunch({ args: [...process.argv.slice(1), "--ozone-platform=x11"] });
+  app.quit();
+}
 if (process.platform === "linux") app.setDesktopName(app.isPackaged ? LINUX_DESKTOP_NAME : LINUX_DEV_DESKTOP_NAME);
 if (e2eUserDataDir) {
   app.setPath("userData", e2eUserDataDir);
@@ -34,7 +41,7 @@ if (squirrelStartup) {
   app.quit();
 }
 
-const hasSingleInstanceLock = squirrelStartup || app.requestSingleInstanceLock();
+const hasSingleInstanceLock = relaunchForKde || squirrelStartup || app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
   app.quit();
 }
@@ -45,6 +52,7 @@ let isQuitting = false;
 let isOverlayVisible = false;
 let regularWindowBounds: Electron.Rectangle | null = null;
 let registeredOverlayShortcut: string | null = null;
+let kdeShortcutPortal: KdeShortcutPortal | null = null;
 const startedInBackground = process.argv.includes("--launch-in-background");
 let quitWhenGameCloses = startedInBackground;
 let rocketLeagueClient = null;
@@ -248,8 +256,8 @@ function toggleOverlay() {
     height: overlayHeight,
   });
   mainWindow.setAlwaysOnTop(true, "screen-saver");
-  // Electron cannot show a native Wayland window without activating it.
-  if (process.platform === "linux" && process.env.XDG_SESSION_TYPE === "wayland") {
+  // Native Wayland cannot show this Electron window without activating it.
+  if (process.platform === "linux" && process.env.XDG_SESSION_TYPE === "wayland" && !kdeWayland) {
     mainWindow.show();
     mainWindow.focus();
   } else {
@@ -347,17 +355,34 @@ async function setOverlaySettings(shortcut: string, panelTransparency: number): 
   const effectiveShortcut = previousShortcut && equivalentOverlayShortcuts(previousShortcut, normalizedShortcut, process.platform === "darwin")
     ? previousShortcut : normalizedShortcut;
   const changedShortcut = effectiveShortcut !== previousShortcut;
-  if (changedShortcut && !globalShortcut.register(effectiveShortcut, toggleOverlay)) {
-    throw new Error("That shortcut is unavailable. Choose another key combination.");
+  if (changedShortcut) {
+    if (kdeShortcutPortal) {
+      try {
+        if (!await kdeShortcutPortal.bind(effectiveShortcut)) {
+          throw new Error("KDE did not bind that shortcut. Choose another combination in KDE Shortcuts.");
+        }
+      } catch (error) {
+        if (previousShortcut) {
+          try { await kdeShortcutPortal.bind(previousShortcut); }
+          catch (restoreError) { console.warn("Could not restore the previous KDE shortcut:", restoreError); }
+        }
+        throw error;
+      }
+    } else if (!globalShortcut.register(effectiveShortcut, toggleOverlay)) {
+      throw new Error("That shortcut is unavailable. Choose another key combination.");
+    }
   }
   try {
     await setOverlayPreferences(app.getPath("userData"), effectiveShortcut, panelTransparency);
   } catch (error) {
-    if (changedShortcut) globalShortcut.unregister(effectiveShortcut);
+    if (changedShortcut) {
+      if (kdeShortcutPortal && previousShortcut) await kdeShortcutPortal.bind(previousShortcut);
+      else if (!kdeShortcutPortal) globalShortcut.unregister(effectiveShortcut);
+    }
     throw error;
   }
   if (changedShortcut) {
-    if (previousShortcut) globalShortcut.unregister(previousShortcut);
+    if (previousShortcut && !kdeShortcutPortal) globalShortcut.unregister(previousShortcut);
     registeredOverlayShortcut = effectiveShortcut;
     updateTrayMenu();
   }
@@ -536,7 +561,7 @@ function createTokenCodec() {
   };
 }
 
-if (!squirrelStartup && hasSingleInstanceLock) app.whenReady().then(async () => {
+if (!squirrelStartup && !relaunchForKde && hasSingleInstanceLock) app.whenReady().then(async () => {
   app.on("second-instance", (_event, argv) => {
     if (!argv.includes("--launch-in-background")) showRegularWindow();
   });
@@ -553,14 +578,23 @@ if (!squirrelStartup && hasSingleInstanceLock) app.whenReady().then(async () => 
     }
   }
   const overlayPreferences = await getOverlayPreferences(app.getPath("userData"));
-  if (globalShortcut.register(overlayPreferences.shortcut, toggleOverlay)) {
+  if (kdeWayland) {
+    kdeShortcutPortal = new KdeShortcutPortal(toggleOverlay);
+    try {
+      if (await kdeShortcutPortal.bind(overlayPreferences.shortcut)) registeredOverlayShortcut = overlayPreferences.shortcut;
+      else console.warn(`KDE did not bind overlay shortcut ${overlayPreferences.shortcut}.`);
+    } catch (error) {
+      console.warn("Could not register KDE overlay shortcut:", error);
+    }
+  } else if (globalShortcut.register(overlayPreferences.shortcut, toggleOverlay)) {
     registeredOverlayShortcut = overlayPreferences.shortcut;
   } else {
     console.warn(`Unable to register overlay shortcut ${overlayPreferences.shortcut}.`);
   }
   createTray();
   app.once("will-quit", () => {
-    if (registeredOverlayShortcut) globalShortcut.unregister(registeredOverlayShortcut);
+    if (kdeShortcutPortal) kdeShortcutPortal.stop();
+    else if (registeredOverlayShortcut) globalShortcut.unregister(registeredOverlayShortcut);
   });
   ipcMain.handle(Channels.WINDOW_HIDE, hideWindow);
   ipcMain.handle(Channels.WINDOW_TOGGLE_OVERLAY, toggleOverlay);

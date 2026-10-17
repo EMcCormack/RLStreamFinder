@@ -42,9 +42,9 @@ To create a local packaged app instead, run `pnpm package` and open the app in `
 
 On Windows, **Launch with Rocket League** is optional and off by default. Enable it on the first-run screen or later under **Settings**. When enabled, a small watcher starts at Windows sign-in and opens the app when Rocket League starts. Turning it off removes the sign-in entry and stops a watcher already running.
 
-Use the gear button in the upper right to change the global overlay shortcut and panel transparency. The shortcut works on Windows and Linux when the desktop grants global shortcuts. On Linux Wayland, both `pnpm start` and the packaged app install their own desktop entries for shortcut portal identity; your desktop may also ask for permission to bind the key. Restart a development run after updating this feature so it can create the entry before registering the shortcut. Run the packaged app from its final extracted location so its desktop entry points to the correct executable.
+Use the gear button in the upper right to change the global overlay shortcut and panel transparency. The shortcut works on Windows and Linux when the desktop grants global shortcuts. On KDE Wayland, the app binds a stable shortcut through the desktop portal, so KDE should ask for approval only for a new key combination. Development and packaged builds use separate desktop entries. Run the packaged app from its final extracted location so its desktop entry points to the correct executable. If you previously approved shortcuts for the older RLStreamFinder entry, you can remove those old entries in KDE System Settings → Shortcuts.
 
-On Windows, the shortcut shows the overlay without taking keyboard focus from the game. Electron does not support showing without focus or keeping a window above others on native Wayland, so KDE Wayland needs a compositor-specific overlay for the same behavior.
+On Windows, the shortcut shows the overlay without taking keyboard focus from the game. On KDE Wayland, the app runs its window through XWayland so the shortcut can show it without moving keyboard focus away from Rocket League. Use a borderless or windowed game display if an exclusive fullscreen game covers the overlay.
 
 ![Settings dialog with overlay shortcut and transparency controls](docs/screenshots/settings-modal.png)
 

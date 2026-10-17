@@ -1,9 +1,10 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { isKdeWayland } from "./kde-shortcut-portal";
 
-export const LINUX_DESKTOP_NAME = "com.emcormack.rlstreamfinder.desktop";
-export const LINUX_DEV_DESKTOP_NAME = "com.emcormack.rlstreamfinder.dev.desktop";
+export const LINUX_DESKTOP_NAME = "com.emcormack.rlstreamfinder.v2.desktop";
+export const LINUX_DEV_DESKTOP_NAME = "com.emcormack.rlstreamfinder.dev.v2.desktop";
 
 function desktopExecArgument(value: string): string {
   return `"${value.replace(/\\/g, "\\\\").replace(/"/g, "\\\"").replace(/\$/g, "\\$").replace(/`/g, "\\`")}"`;
@@ -19,19 +20,16 @@ export async function ensureLinuxDesktopEntry(
   const baseDirectory = dataHome && path.isAbsolute(dataHome) ? dataHome : path.join(os.homedir(), ".local", "share");
   const applicationsDirectory = path.join(baseDirectory, "applications");
   await mkdir(applicationsDirectory, { recursive: true });
+  const launcherArgs = [executablePath, ...(isKdeWayland() ? ["--ozone-platform=x11"] : []), ...execArgs];
   const content = [
     "[Desktop Entry]",
     "Type=Application",
     "Name=RLStreamFinder",
-    `Exec=${[executablePath, ...execArgs].map(desktopExecArgument).join(" ")}`,
+    `Exec=${launcherArgs.map(desktopExecArgument).join(" ")}`,
     `Icon=${iconPath}`,
     "Categories=Game;Utility;",
     "Terminal=false",
     "",
   ].join("\n");
-  try {
-    await writeFile(path.join(applicationsDirectory, desktopName), content, { flag: desktopName === LINUX_DEV_DESKTOP_NAME ? "w" : "wx" });
-  } catch (error) {
-    if (error.code !== "EEXIST") throw error;
-  }
+  await writeFile(path.join(applicationsDirectory, desktopName), content);
 }
