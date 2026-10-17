@@ -248,8 +248,13 @@ function toggleOverlay() {
     height: overlayHeight,
   });
   mainWindow.setAlwaysOnTop(true, "screen-saver");
-  mainWindow.show();
-  mainWindow.focus();
+  // Electron cannot show a native Wayland window without activating it.
+  if (process.platform === "linux" && process.env.XDG_SESSION_TYPE === "wayland") {
+    mainWindow.show();
+    mainWindow.focus();
+  } else {
+    mainWindow.showInactive();
+  }
   isOverlayVisible = true;
 }
 
