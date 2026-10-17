@@ -20,6 +20,7 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - name: Check tag matches package version
+        if: github.ref_type == 'tag'
         env:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
@@ -72,6 +73,7 @@ jobs:
           if-no-files-found: error
 
   draft-release:
+    if: github.ref_type == 'tag'
     needs: build
     runs-on: ubuntu-latest
     permissions:
