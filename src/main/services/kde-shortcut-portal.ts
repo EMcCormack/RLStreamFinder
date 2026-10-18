@@ -21,6 +21,12 @@ export function portalTrigger(shortcut: string): string {
   return [...modifiers, key.length === 1 ? key.toLowerCase() : key].join("+");
 }
 
+export function nodeSocketBusAddress(address: string | undefined): string | undefined {
+  // dbus-next uses the obsolete usocket package for unix:path, but its
+  // unix:socket branch uses Node's built-in net.createConnection.
+  return address?.replace(/(^|;)unix:path=/g, "$1unix:socket=");
+}
+
 export class KdeShortcutPortal {
   private bus: MessageBus | null = null;
   private portal: ClientInterface | null = null;
@@ -67,7 +73,7 @@ export class KdeShortcutPortal {
 
   private async connect(): Promise<void> {
     if (this.bus) return;
-    const bus = dbus.sessionBus();
+    const bus = dbus.sessionBus({ busAddress: nodeSocketBusAddress(process.env.DBUS_SESSION_BUS_ADDRESS) });
     bus.on("error", (error) => console.warn("KDE shortcut portal D-Bus error:", error));
     bus.on("message", this.onMessage);
     this.bus = bus;
