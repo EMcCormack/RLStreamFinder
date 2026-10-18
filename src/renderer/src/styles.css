@@ -37,7 +37,7 @@ header {
 
 .window-controls {
   position: fixed;
-  top: 8px;
+  top: 2px;
   right: 10px;
   z-index: 100;
   display: flex;
@@ -69,6 +69,31 @@ header {
 
 .adjustable-panel-muted {
   background-color: rgb(51 65 85 / var(--panel-opacity, .92));
+}
+
+.previous-streamer-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #64748b transparent;
+}
+
+.previous-streamer-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.previous-streamer-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.previous-streamer-scroll::-webkit-scrollbar-thumb {
+  background: #64748b;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+.previous-streamer-scroll::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+  background-clip: padding-box;
 }
 
 button,

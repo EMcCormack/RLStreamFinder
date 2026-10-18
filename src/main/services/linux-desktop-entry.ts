@@ -3,8 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import { isKdeWayland } from "./kde-shortcut-portal";
 
-export const LINUX_DESKTOP_NAME = "com.emcormack.rlstreamfinder.v2.desktop";
-export const LINUX_DEV_DESKTOP_NAME = "com.emcormack.rlstreamfinder.dev.v2.desktop";
+export const LINUX_DESKTOP_NAME = "com.emcormack.rlstreamfinder.desktop";
+export const LINUX_DEV_DESKTOP_NAME = "com.emcormack.rlstreamfinder.dev.desktop";
 
 function desktopExecArgument(value: string): string {
   return `"${value.replace(/\\/g, "\\\\").replace(/"/g, "\\\"").replace(/\$/g, "\\$").replace(/`/g, "\\`")}"`;

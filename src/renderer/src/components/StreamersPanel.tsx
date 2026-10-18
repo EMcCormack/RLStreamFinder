@@ -153,7 +153,7 @@ export function StreamersPanel({ results, snapshot, status }) {
   const restore = (item) => setSaved((previous) => ({ ...previous, dismissed: previous.dismissed.filter((key) => key !== streamerKey(item)) }));
 
   return (
-    <aside className="adjustable-panel rounded-lg border border-slate-700 p-4 shadow-2xl">
+    <aside className="adjustable-panel min-h-[520px] rounded-lg border border-slate-700 p-4 shadow-2xl">
       <div className="mb-4">
         <h2 className="text-lg font-black">Streamers</h2>
         <p className={`text-sm ${status.isError ? "text-rose-300" : "text-slate-400"}`}>{status.message}</p>
@@ -169,7 +169,7 @@ export function StreamersPanel({ results, snapshot, status }) {
           <h3 className="text-xs font-black uppercase tracking-wide text-slate-400">Previous Streamers</h3>
           <div className="h-px flex-1 bg-slate-600" />
         </div>
-        <div className="grid max-h-[22rem] gap-2 overflow-y-auto pr-1" aria-label="Previous streamer list" tabIndex={0}>
+        <div className="previous-streamer-scroll grid max-h-[22rem] gap-2 overflow-y-auto pr-2" aria-label="Previous streamer list" tabIndex={0}>
           {past.map((item) => {
             const recentStatus = hasRecentStreamStatus(item, now) ? getTwitchLookupStatus(item) : null;
             return <div key={streamerKey(item)} className="adjustable-panel-secondary flex min-h-16 items-center justify-between gap-2 rounded-md border border-slate-700 p-2 text-sm">

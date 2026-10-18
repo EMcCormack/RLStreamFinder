@@ -8,7 +8,6 @@ import { RocketLeagueHelp } from "./components/RocketLeagueHelp.tsx";
 import { TwitchHelp } from "./components/TwitchHelp.tsx";
 import { SetupSplash } from "./components/SetupSplash.tsx";
 import { SettingsDialog } from "./components/SettingsDialog.tsx";
-import { Settings } from "lucide-react";
 import { DEFAULT_OVERLAY_SHORTCUT, DEFAULT_PANEL_TRANSPARENCY, type OverlaySettings } from "../../shared/overlay-settings";
 // No DEV mocks in production: do not import DEV_MOCK_SNAPSHOT
 import { buildRosterKey, getScannablePlayerNames } from "./helpers/match.ts";
@@ -298,7 +297,7 @@ function App() {
     return (
       <main className="mx-auto w-full p-4 text-slate-50">
         <div className="window-titlebar" aria-hidden="true">RLStreamFinder</div>
-        <div className="window-controls"><button type="button" onClick={() => setShowSettings(true)} aria-label="Open settings"><Settings size={16} /></button><button type="button" onClick={() => window.rocketLeagueViewer.hideWindow()} aria-label="Hide RLStreamFinder">×</button></div>
+        <div className="window-controls"><button type="button" onClick={() => window.rocketLeagueViewer.hideWindow()} aria-label="Hide RLStreamFinder">×</button></div>
         <AuthNotice authFlow={authFlow} />
         <SetupSplash
           twitchConnected={twitchConnected}
@@ -307,6 +306,7 @@ function App() {
           onConnectTwitch={connectTwitch}
           onRocketHelp={() => setShowRocketHelp(true)}
           onTwitchHelp={() => setShowTwitchHelp(true)}
+          onOpenSettings={() => setShowSettings(true)}
           onComplete={async () => {
             await window.rocketLeagueViewer.completeSetup();
             setSetupCompleted(true);
@@ -321,8 +321,8 @@ function App() {
 
   return (
     <main className="mx-auto w-full max-w-[1280px] p-4 text-slate-50" style={{ "--panel-opacity": (100 - (overlaySettings?.panelTransparency ?? DEFAULT_PANEL_TRANSPARENCY)) / 100 } as React.CSSProperties}>
-      <div className="window-controls"><button type="button" onClick={() => setShowSettings(true)} aria-label="Open settings"><Settings size={16} /></button><button type="button" onClick={() => window.rocketLeagueViewer.hideWindow()} aria-label="Hide RLStreamFinder">×</button></div>
-      <header className="adjustable-panel flex min-h-20 flex-wrap items-center justify-between gap-4 rounded-lg border border-slate-700 pb-4 pl-4 pr-20 pt-3">
+      <div className="window-controls"><button type="button" onClick={() => window.rocketLeagueViewer.hideWindow()} aria-label="Hide RLStreamFinder">×</button></div>
+      <header className="adjustable-panel flex min-h-20 flex-wrap items-center justify-between gap-4 rounded-lg border border-slate-700 p-4">
         <div className="scanner-drag-region">
           <p className="mb-1 text-xs font-black uppercase text-teal-300">RLStreamFinder</p>
           <h1 className="text-3xl font-black tracking-normal">Live Match Scanner</h1>
@@ -337,12 +337,13 @@ function App() {
         onConnectTwitch={connectTwitch}
         onRocketHelp={() => setShowRocketHelp(true)}
         onTwitchHelp={() => setShowTwitchHelp(true)}
+        onOpenSettings={() => setShowSettings(true)}
       />
       </header>
 
       <AuthNotice authFlow={authFlow} />
 
-      <section className="grid grid-cols-[minmax(0,1fr)_460px] items-start gap-3 max-lg:grid-cols-1">
+      <section className="grid grid-cols-[minmax(0,1fr)_460px] items-stretch gap-3 max-lg:grid-cols-1">
         <MatchPanel
           results={results}
           snapshot={snapshot}

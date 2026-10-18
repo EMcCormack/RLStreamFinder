@@ -5,6 +5,12 @@ test("uses a transparent window and toggles the overlay above other windows", as
   const electronApp = await launchTestElectron(testInfo);
   try {
     const page = await electronApp.firstWindow();
+    const { bounds, workArea } = await electronApp.evaluate(({ BrowserWindow, screen }) => ({
+      bounds: BrowserWindow.getAllWindows()[0].getBounds(),
+      workArea: screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea,
+    }));
+    expect(bounds.x + bounds.width).toBe(workArea.x + workArea.width);
+    expect(bounds.y).toBe(workArea.y);
     expect(await electronApp.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isAlwaysOnTop())).toBe(false);
     expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
     await page.evaluate(() => window.rocketLeagueViewer.toggleOverlay());
@@ -204,6 +210,7 @@ test("changes the global shortcut and panel transparency from the settings modal
     await page.getByRole("button", { name: "Open match scanner" }).click();
     const settingsButton = page.getByRole("button", { name: "Open settings" });
     await expect(settingsButton).toBeVisible();
+    await expect(page.getByRole("region", { name: "Connections" }).getByRole("button", { name: "Open settings" })).toBeVisible();
     const settingsButtonBounds = await settingsButton.evaluate((button) => {
       const { x, y, width, height } = button.getBoundingClientRect();
       return { x, y, width, height };
@@ -429,6 +436,10 @@ test("moves streamers below Previous Streamers when the board clears", async ({}
     await page.reload({ waitUntil: "domcontentloaded" });
     const streamers = page.getByRole("complementary");
     await expect(streamers.getByRole("button", { name: "Close GarrettG_TTV" })).toBeVisible();
+    const currentPlayers = page.getByRole("heading", { name: "Current Players" }).locator("../..");
+    const playerHeight = await currentPlayers.evaluate((element) => element.getBoundingClientRect().height);
+    const streamerHeight = await streamers.evaluate((element) => element.getBoundingClientRect().height);
+    expect(streamerHeight).toBe(playerHeight);
     await page.clock.install();
     await electronApp.evaluate(({ BrowserWindow }) => {
       for (const window of BrowserWindow.getAllWindows()) window.webContents.send("rocket-league:update", {
@@ -479,6 +490,9 @@ test("keeps ten previous streamers in a five-row scroll area", async ({}, testIn
 
     const previous = page.getByRole("region", { name: "Previous Streamers" });
     const list = previous.getByLabel("Previous streamer list");
+    const panel = page.getByRole("complementary");
+    expect(await panel.evaluate((element) => getComputedStyle(element).overflowY)).toBe("visible");
+    expect(await list.evaluate((element) => getComputedStyle(element).scrollbarWidth)).toBe("thin");
     await expect(previous.locator(".min-h-16")).toHaveCount(10);
     await expect(previous.getByText("Previous9", { exact: true })).toBeAttached();
     await expect(previous.getByText("Previous10", { exact: true })).toHaveCount(0);

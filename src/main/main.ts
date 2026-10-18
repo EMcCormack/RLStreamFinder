@@ -15,6 +15,7 @@ import { RocketLeagueConnectionPoller } from "./services/rocket-league-poller";
 import { startWindowsUpdates } from "./services/app-updates";
 import { ensureLinuxDesktopEntry, LINUX_DESKTOP_NAME, LINUX_DEV_DESKTOP_NAME } from "./services/linux-desktop-entry";
 import { isKdeWayland, KdeShortcutPortal } from "./services/kde-shortcut-portal";
+import { ensureKdeOverlayRule, isKdeDesktop } from "./services/kde-overlay-rule";
 import { Channels, type WindowsStartupSettings } from "../shared/ipc-contracts";
 import { equivalentOverlayShortcuts, normalizeOverlayShortcut, validatePanelTransparency, type OverlaySettings } from "../shared/overlay-settings";
 import { completeSetup, getLaunchWithRocketLeague, getOverlayPreferences, getSetupCompleted, setLaunchWithRocketLeague, setOverlayPreferences } from "./services/setup-preferences";
@@ -147,6 +148,13 @@ function registerTwitchEmbedHeaderPatch() {
   );
 }
 
+function getTopRightWindowBounds(preferredWidth: number, preferredHeight: number): Electron.Rectangle {
+  const { workArea } = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+  const width = Math.min(preferredWidth, workArea.width);
+  const height = Math.min(preferredHeight, workArea.height);
+  return { x: workArea.x + workArea.width - width, y: workArea.y, width, height };
+}
+
 function createMainWindow() {
   const preloadPath = path.join(__dirname, "index.js");
 
@@ -155,8 +163,7 @@ function createMainWindow() {
   : path.join(app.getAppPath(), 'assets', 'icon.png');
 
   mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 820,
+    ...getTopRightWindowBounds(1280, 820),
     minWidth: 980,
     minHeight: 620,
     transparent: true,
@@ -243,19 +250,10 @@ function toggleOverlay() {
     return;
   }
 
-  const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
   if (!isOverlayVisible && (mainWindow.isVisible() || !regularWindowBounds)) {
     regularWindowBounds = mainWindow.getBounds();
   }
-  const { x, y, width, height } = display.workArea;
-  const overlayWidth = Math.min(1100, width);
-  const overlayHeight = Math.min(720, height);
-  mainWindow.setBounds({
-    x: x + width - overlayWidth,
-    y,
-    width: overlayWidth,
-    height: overlayHeight,
-  });
+  mainWindow.setBounds(getTopRightWindowBounds(1100, 720));
   mainWindow.setAlwaysOnTop(true, "screen-saver");
   // Native Wayland cannot show this Electron window without activating it.
   if (process.platform === "linux" && process.env.XDG_SESSION_TYPE === "wayland" && !usingXWayland) {
@@ -576,6 +574,13 @@ if (!squirrelStartup && !relaunchForKde && hasSingleInstanceLock) app.whenReady(
       }
     } catch (error) {
       console.warn("Could not install Linux desktop entry for global shortcuts:", error);
+    }
+  }
+  if (isKdeDesktop() && !e2eUserDataDir) {
+    try {
+      await ensureKdeOverlayRule(app.isPackaged ? LINUX_DESKTOP_NAME : LINUX_DEV_DESKTOP_NAME);
+    } catch (error) {
+      console.warn("Could not set KDE overlay stacking rule:", error);
     }
   }
   const overlayPreferences = await getOverlayPreferences(app.getPath("userData"));

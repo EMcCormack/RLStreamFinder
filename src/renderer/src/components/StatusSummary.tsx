@@ -1,4 +1,5 @@
 import { ActionButton, StatusDot } from "./ui.tsx";
+import { Settings } from "lucide-react";
 
 export function ConnectionSummary({
   rocketState,
@@ -9,6 +10,7 @@ export function ConnectionSummary({
   onConnectTwitch,
   onRocketHelp,
   onTwitchHelp,
+  onOpenSettings,
 }) {
   const rocketConnected = Boolean(rocketState?.connected);
   return (
@@ -37,6 +39,9 @@ export function ConnectionSummary({
         </ActionButton> : null}
         <button type="button" aria-label="Why connect Twitch?" title="Why connect Twitch?" onClick={onTwitchHelp} className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-500 text-xs font-bold text-slate-300 hover:border-teal-300 hover:text-teal-300">?</button>
       </div>
+      <button type="button" aria-label="Open settings" title="Settings" onClick={onOpenSettings} className="adjustable-panel flex h-14 w-14 items-center justify-center rounded-lg border border-slate-700 text-slate-200 hover:border-teal-300 hover:text-teal-300">
+        <Settings size={18} aria-hidden="true" />
+      </button>
     </section>
   );
 }

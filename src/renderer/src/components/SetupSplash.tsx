@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Gamepad2, Radio, Check } from "lucide-react";
+import { Gamepad2, Radio, Check, Settings } from "lucide-react";
 import { ActionButton } from "./ui.tsx";
 import type { RocketLeagueSetupAvailability } from "../../../shared/ipc-contracts";
 import { WindowsStartupSetting } from "./WindowsStartupSetting.tsx";
@@ -11,10 +11,11 @@ type SetupSplashProps = {
   onConnectTwitch: () => void;
   onRocketHelp: () => void;
   onTwitchHelp: () => void;
+  onOpenSettings: () => void;
   onComplete: () => Promise<void>;
 };
 
-export function SetupSplash({ twitchConnected, connectingTwitch, status, onConnectTwitch, onRocketHelp, onTwitchHelp, onComplete }: SetupSplashProps) {
+export function SetupSplash({ twitchConnected, connectingTwitch, status, onConnectTwitch, onRocketHelp, onTwitchHelp, onOpenSettings, onComplete }: SetupSplashProps) {
   const [settingUp, setSettingUp] = useState(false);
   const [configured, setConfigured] = useState(false);
   const [availability, setAvailability] = useState<RocketLeagueSetupAvailability | null>(null);
@@ -99,7 +100,10 @@ export function SetupSplash({ twitchConnected, connectingTwitch, status, onConne
         </section>
       </div>
       <section className="mt-4 rounded-xl border border-slate-700 bg-slate-900 p-6" aria-label="Startup settings">
-        <h2 className="mb-3 text-xl font-bold">Startup settings</h2>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="text-xl font-bold">Startup settings</h2>
+          <button type="button" aria-label="Open settings" title="Settings" onClick={onOpenSettings} className="flex h-10 w-10 items-center justify-center rounded-md border border-slate-600 text-slate-200 hover:border-teal-300 hover:text-teal-300"><Settings size={18} aria-hidden="true" /></button>
+        </div>
         <WindowsStartupSetting onBusyChange={setSavingStartup} />
       </section>
       {status.message !== "Ready." ? <p role="status" className={`mt-4 text-sm ${status.isError ? "text-rose-300" : "text-slate-400"}`}>{status.message}</p> : null}

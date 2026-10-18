@@ -56,7 +56,7 @@ export function MatchPanel({ results, snapshot }) {
   const otherPlayers = players.filter((player) => player.TeamNum !== 0 && player.TeamNum !== 1);
 
   return (
-    <section className="adjustable-panel rounded-lg border border-slate-700 p-4 shadow-2xl">
+    <section className="adjustable-panel min-h-[520px] rounded-lg border border-slate-700 p-4 shadow-2xl">
       <div className="mb-4">
         <h2 className="text-lg font-black">Current Players</h2>
         <p className="text-sm text-slate-400">{snapshot ? "Checking the live roster for Twitch channels." : "Connect to Rocket League to see the live roster."}</p>
