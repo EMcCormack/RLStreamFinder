@@ -25,7 +25,9 @@ const config: ForgeConfig = {
       ...(process.platform === "win32" ? ["./bootstrap/target/release/rl-stream-finder-bootstrap.exe"] : []),
     ],
   },
-  rebuildConfig: {},
+  // dbus-next optionally depends on obsolete usocket, but the KDE portal path
+  // is normalized to use Node's built-in socket support instead.
+  rebuildConfig: { ignoreModules: ["usocket"] },
   hooks: {
     prePackage: async (_config, platform) => {
       if (platform === "win32") {

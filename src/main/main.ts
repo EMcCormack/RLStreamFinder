@@ -63,6 +63,8 @@ let latestRocketLeagueSnapshot = null;
 let rocketLeagueDebugSequence = 0;
 const ENCRYPTED_TOKEN_PREFIX = "electron-safe-storage:v1:";
 
+app.on("before-quit", () => { isQuitting = true; });
+
 function getPlayerNames(snapshot) {
   return (snapshot?.players ?? [])
     .map((player) => player?.Name)

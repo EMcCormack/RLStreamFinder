@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { OverlaySettings } from "../../../shared/overlay-settings";
 import { ActionButton } from "./ui.tsx";
 import { WindowsStartupSetting } from "./WindowsStartupSetting.tsx";
+import { WindowsOverlayNotice } from "./WindowsOverlayNotice.tsx";
 
 type SettingsDialogProps = {
   settings: OverlaySettings | null;
@@ -53,6 +54,7 @@ export function SettingsDialog({ settings, onSaved, onClose }: SettingsDialogPro
           <input id="overlay-shortcut" value={shortcut} onChange={(event) => setShortcut(event.target.value)} spellCheck={false} className="mt-2 w-full rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-50" />
           <p className="mt-2 text-xs text-slate-400">Use modifiers and a letter, number, or F1–F12. Example: Control+Alt+R.</p>
           {!settings.shortcutActive ? <p role="status" className="mt-2 text-sm text-amber-300">The saved shortcut could not be registered. Choose another combination.</p> : null}
+          <WindowsOverlayNotice />
         </div>
         <div>
           <label htmlFor="panel-transparency" className="flex justify-between text-sm font-semibold"><span>Panel transparency</span><span>{transparency}%</span></label>

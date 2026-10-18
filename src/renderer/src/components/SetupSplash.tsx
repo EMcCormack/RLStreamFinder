@@ -3,6 +3,7 @@ import { Gamepad2, Radio, Check, Settings } from "lucide-react";
 import { ActionButton } from "./ui.tsx";
 import type { RocketLeagueSetupAvailability } from "../../../shared/ipc-contracts";
 import { WindowsStartupSetting } from "./WindowsStartupSetting.tsx";
+import { WindowsOverlayNotice } from "./WindowsOverlayNotice.tsx";
 
 type SetupSplashProps = {
   twitchConnected: boolean;
@@ -88,6 +89,7 @@ export function SetupSplash({ twitchConnected, connectingTwitch, status, onConne
           {configured ? <p className="mt-3 flex items-center gap-2 text-sm text-teal-300"><Check size={16} aria-hidden="true" />Configuration saved</p> : null}
           {result ? <p role="status" className={`mt-3 text-sm ${result.isError ? "text-rose-300" : "text-slate-300"}`}>{result.message}</p> : null}
           <button type="button" onClick={onRocketHelp} className="mt-4 block text-sm text-sky-300 hover:underline">Manual setup and troubleshooting</button>
+          <WindowsOverlayNotice />
         </section>
         <section className="rounded-xl border border-slate-700 bg-slate-900 p-6">
           <Radio className="mb-5 text-teal-300" size={28} aria-hidden="true" />

@@ -1,5 +1,6 @@
 import { EventEmitter } from "node:events";
 import { existsSync } from "node:fs";
+import path from "node:path";
 import type { MessageBoxOptions } from "electron";
 import { afterEach, beforeEach, expect, test, vi, type Mock } from "vitest";
 import { startWindowsUpdates } from "../src/main/services/app-updates";
@@ -59,7 +60,7 @@ test.each([
 test("skips unpacked Windows builds without Squirrel's Update.exe", () => {
   vi.mocked(existsSync).mockReturnValue(false);
   start();
-  expect(existsSync).toHaveBeenCalledWith("/installed/Update.exe");
+  expect(existsSync).toHaveBeenCalledWith(path.resolve("/installed/Update.exe"));
   expect(updater.setFeedURL).not.toHaveBeenCalled();
 });
 
