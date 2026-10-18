@@ -1,6 +1,7 @@
 {
   "name": "rl-stream-finder",
   "productName": "RLStreamFinder",
+  "desktopName": "com.emcormack.rlstreamfinder.desktop",
   "version": "0.1.0",
   "description": "Find live streamers in your Rocket League matches.",
   "author": "Ethan McCormack",
@@ -10,8 +11,8 @@
   },
   "main": ".vite/build/main.js",
   "scripts": {
-    "start": "electron-forge start",
-    "dev": "electron-forge start",
+    "start": "node ./scripts/start.mjs",
+    "dev": "node ./scripts/start.mjs",
     "twitch:debug": "pnpm build && electron . --twitch-debug",
     "package": "electron-forge package",
     "make": "electron-forge make",
@@ -33,6 +34,7 @@
     "@twurple/api": "8.2.0",
     "@twurple/auth": "8.2.0",
     "@vitejs/plugin-react": "^6.1.1",
+    "dbus-next": "^0.10.2",
     "electron-squirrel-startup": "^1.0.1",
     "lucide-react": "^1.48.0",
     "react": "^19.3.0",

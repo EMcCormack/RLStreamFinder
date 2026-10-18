@@ -40,6 +40,14 @@ To create a local packaged app instead, run `pnpm package` and open the app in `
 2. **Connect Rocket League.** Restart the game, join a live match, and click **Connect RL**. The roster only appears while Rocket League is sending live match data.
 3. **Connect Twitch.** Click **Connect Twitch** and enter the displayed code on the Twitch page opened in your browser. The app does not ask for your Twitch password or extra permissions. Click the Twitch **?** for an explanation in the app.
 
+On Windows, **Launch with Rocket League** is optional and off by default. Enable it on the first-run screen or later under **Settings**. When enabled, a small watcher starts at Windows sign-in and opens the app when Rocket League starts. Turning it off removes the sign-in entry and stops a watcher already running.
+
+Use the gear button in the upper right to change the global overlay shortcut and panel transparency. The shortcut works on Windows and Linux when the desktop grants global shortcuts. On KDE Wayland, the app binds a stable shortcut through the desktop portal, so KDE should ask for approval only for a new key combination. Development and packaged builds use separate desktop entries. Run the packaged app from its final extracted location so its desktop entry points to the correct executable. If you previously approved shortcuts for the older RLStreamFinder entry, you can remove those old entries in KDE System Settings → Shortcuts.
+
+On Windows, the shortcut shows the overlay without taking keyboard focus from the game. On KDE Wayland, the app runs its window through XWayland so the shortcut can show it without moving keyboard focus away from Rocket League. Use a borderless or windowed game display if an exclusive fullscreen game covers the overlay.
+
+![Settings dialog with overlay shortcut and transparency controls](docs/screenshots/settings-modal.png)
+
 ![First launch with connection controls at the top right](docs/screenshots/first-launch.png)
 
 ### Rocket League setup screen

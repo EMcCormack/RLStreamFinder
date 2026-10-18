@@ -10,5 +10,8 @@ export default defineConfig({
   },
   build: {
     target: "node24",
+    rolldownOptions: {
+      external: ["x11", "usocket"],
+    },
   },
 });

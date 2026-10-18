@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import { Gamepad2, Radio, Check } from "lucide-react";
+import { Gamepad2, Radio, Check, Settings } from "lucide-react";
 import { ActionButton } from "./ui.tsx";
 import type { RocketLeagueSetupAvailability } from "../../../shared/ipc-contracts";
+import { WindowsStartupSetting } from "./WindowsStartupSetting.tsx";
+import { WindowsOverlayNotice } from "./WindowsOverlayNotice.tsx";
 
 type SetupSplashProps = {
   twitchConnected: boolean;
@@ -10,10 +12,11 @@ type SetupSplashProps = {
   onConnectTwitch: () => void;
   onRocketHelp: () => void;
   onTwitchHelp: () => void;
+  onOpenSettings: () => void;
   onComplete: () => Promise<void>;
 };
 
-export function SetupSplash({ twitchConnected, connectingTwitch, status, onConnectTwitch, onRocketHelp, onTwitchHelp, onComplete }: SetupSplashProps) {
+export function SetupSplash({ twitchConnected, connectingTwitch, status, onConnectTwitch, onRocketHelp, onTwitchHelp, onOpenSettings, onComplete }: SetupSplashProps) {
   const [settingUp, setSettingUp] = useState(false);
   const [configured, setConfigured] = useState(false);
   const [availability, setAvailability] = useState<RocketLeagueSetupAvailability | null>(null);
@@ -22,7 +25,8 @@ export function SetupSplash({ twitchConnected, connectingTwitch, status, onConne
   const [result, setResult] = useState<{ message: string; isError: boolean } | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
-  const busy = settingUp || connectingTwitch || saving;
+  const [savingStartup, setSavingStartup] = useState(false);
+  const busy = settingUp || connectingTwitch || saving || savingStartup;
 
   useEffect(() => {
     let active = true;
@@ -85,6 +89,7 @@ export function SetupSplash({ twitchConnected, connectingTwitch, status, onConne
           {configured ? <p className="mt-3 flex items-center gap-2 text-sm text-teal-300"><Check size={16} aria-hidden="true" />Configuration saved</p> : null}
           {result ? <p role="status" className={`mt-3 text-sm ${result.isError ? "text-rose-300" : "text-slate-300"}`}>{result.message}</p> : null}
           <button type="button" onClick={onRocketHelp} className="mt-4 block text-sm text-sky-300 hover:underline">Manual setup and troubleshooting</button>
+          <WindowsOverlayNotice />
         </section>
         <section className="rounded-xl border border-slate-700 bg-slate-900 p-6">
           <Radio className="mb-5 text-teal-300" size={28} aria-hidden="true" />
@@ -96,6 +101,13 @@ export function SetupSplash({ twitchConnected, connectingTwitch, status, onConne
           <button type="button" onClick={onTwitchHelp} className="mt-4 block text-sm text-sky-300 hover:underline">Why connect Twitch?</button>
         </section>
       </div>
+      <section className="mt-4 rounded-xl border border-slate-700 bg-slate-900 p-6" aria-label="Startup settings">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="text-xl font-bold">Startup settings</h2>
+          <button type="button" aria-label="Open settings" title="Settings" onClick={onOpenSettings} className="flex h-10 w-10 items-center justify-center rounded-md border border-slate-600 text-slate-200 hover:border-teal-300 hover:text-teal-300"><Settings size={18} aria-hidden="true" /></button>
+        </div>
+        <WindowsStartupSetting onBusyChange={setSavingStartup} />
+      </section>
       {status.message !== "Ready." ? <p role="status" className={`mt-4 text-sm ${status.isError ? "text-rose-300" : "text-slate-400"}`}>{status.message}</p> : null}
       <div className="mt-8 flex flex-wrap items-center gap-4">
         <ActionButton onClick={finish} disabled={busy}>{saving ? "Saving…" : "Open match scanner"}</ActionButton>

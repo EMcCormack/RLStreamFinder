@@ -32,7 +32,7 @@ export function StatusDot({ state }) {
 
 export function StatusCard({ dotState = "idle", label, value, stat }: StatusCardProps) {
   return (
-    <section className="flex min-h-[72px] items-center gap-3 rounded-lg border border-slate-700 bg-slate-900/92 p-4">
+    <section className="adjustable-panel flex min-h-[72px] items-center gap-3 rounded-lg border border-slate-700 p-4">
       {stat ? (
         <span className="min-w-10 text-3xl font-black leading-none text-teal-300">{stat}</span>
       ) : (

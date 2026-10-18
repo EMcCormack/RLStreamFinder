@@ -1,6 +1,27 @@
 import { test, expect } from "@playwright/test";
 import { launchTestElectron } from "./launch-electron";
 
+test("uses a transparent window and toggles the overlay above other windows", async ({}, testInfo) => {
+  const electronApp = await launchTestElectron(testInfo);
+  try {
+    const page = await electronApp.firstWindow();
+    const { bounds, workArea } = await electronApp.evaluate(({ BrowserWindow, screen }) => ({
+      bounds: BrowserWindow.getAllWindows()[0].getBounds(),
+      workArea: screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea,
+    }));
+    expect(bounds.x + bounds.width).toBe(workArea.x + workArea.width);
+    expect(bounds.y).toBe(workArea.y);
+    expect(await electronApp.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isAlwaysOnTop())).toBe(false);
+    expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
+    await page.evaluate(() => window.rocketLeagueViewer.toggleOverlay());
+    expect(await electronApp.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isAlwaysOnTop())).toBe(true);
+    await page.evaluate(() => window.rocketLeagueViewer.toggleOverlay());
+    expect(await electronApp.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible())).toBe(false);
+  } finally {
+    await electronApp.close();
+  }
+});
+
 async function installSmokeIpcMocks(electronApp, identitySource = "explicit", skipSetup = true) {
   if (skipSetup) {
     await electronApp.evaluate(({ ipcMain }) => {
@@ -151,6 +172,78 @@ test("guides first launch through setup and remembers completion after restartin
   }
 });
 
+test("offers opt-in Windows startup on first launch and in scanner settings", async ({}, testInfo) => {
+  const electronApp = await launchTestElectron(testInfo);
+  try {
+    await electronApp.evaluate(({ ipcMain }) => {
+      let enabled = false;
+      ipcMain.removeHandler("windows-startup:get");
+      ipcMain.handle("windows-startup:get", () => ({ supported: true, enabled }));
+      ipcMain.removeHandler("windows-startup:set");
+      ipcMain.handle("windows-startup:set", (_event, value) => {
+        enabled = value;
+        return { supported: true, enabled };
+      });
+    });
+    const page = await electronApp.firstWindow();
+    await page.reload({ waitUntil: "domcontentloaded" });
+    const firstRunSetting = page.getByRole("checkbox", { name: /Launch with Rocket League/ });
+    await expect(firstRunSetting).not.toBeChecked();
+    await firstRunSetting.check();
+    await expect(firstRunSetting).toBeChecked();
+    await page.getByRole("button", { name: "Open match scanner" }).click();
+    await page.getByRole("button", { name: "Open settings" }).click();
+    await expect(page.getByRole("checkbox", { name: /Launch with Rocket League/ })).toBeChecked();
+    await page.getByRole("checkbox", { name: /Launch with Rocket League/ }).uncheck();
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.getByRole("button", { name: "Open settings" }).click();
+    await expect(page.getByRole("checkbox", { name: /Launch with Rocket League/ })).not.toBeChecked();
+  } finally {
+    await electronApp.close();
+  }
+});
+
+test("changes the global shortcut and panel transparency from the settings modal", async ({}, testInfo) => {
+  const electronApp = await launchTestElectron(testInfo);
+  try {
+    const page = await electronApp.firstWindow();
+    await page.getByRole("button", { name: "Open match scanner" }).click();
+    const settingsButton = page.getByRole("button", { name: "Open settings" });
+    await expect(settingsButton).toBeVisible();
+    await expect(page.getByRole("region", { name: "Connections" }).getByRole("button", { name: "Open settings" })).toBeVisible();
+    const settingsButtonBounds = await settingsButton.evaluate((button) => {
+      const { x, y, width, height } = button.getBoundingClientRect();
+      return { x, y, width, height };
+    });
+    await page.mouse.click(
+      settingsButtonBounds!.x + settingsButtonBounds!.width / 2,
+      settingsButtonBounds!.y + settingsButtonBounds!.height / 2,
+    );
+    const dialog = page.getByRole("dialog", { name: "Settings" });
+    await expect(dialog).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath("settings-modal.png") });
+    await dialog.getByLabel("Overlay shortcut").fill("Ctrl+Alt+R");
+    await dialog.getByRole("button", { name: "Save settings" }).click();
+    await expect(dialog).toHaveCount(0);
+    await page.getByRole("button", { name: "Open settings" }).click();
+    await dialog.getByLabel("Overlay shortcut").fill("Control+Alt+Y");
+    await dialog.getByLabel("Panel transparency").focus();
+    await dialog.getByLabel("Panel transparency").press("End");
+    await expect(dialog.getByText("60%", { exact: true })).toBeVisible();
+    await dialog.getByRole("button", { name: "Save settings" }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(page.getByText("Control+Alt+Y toggles overlay")).toBeVisible();
+    expect(await electronApp.evaluate(({ globalShortcut }) => globalShortcut.isRegistered("Control+Alt+Y"))).toBe(true);
+    expect(await page.locator("header").first().evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgba(15, 23, 42, 0.4)");
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.getByRole("button", { name: "Open settings" }).click();
+    await expect(page.getByLabel("Overlay shortcut")).toHaveValue("Control+Alt+Y");
+    await expect(page.getByLabel("Panel transparency")).toHaveValue("60");
+  } finally {
+    await electronApp.close();
+  }
+});
+
 test("adapts setup to missing installations, unsupported platforms, and detection failures", async ({}, testInfo) => {
   const electronApp = await launchTestElectron(testInfo);
   try {
@@ -237,6 +330,8 @@ test("launches Electron, renders the app, exposes preload bridge, and automatica
         getRocketLeagueStatus: typeof bridge?.getRocketLeagueStatus,
         loadRocketLeaguePlayers: typeof bridge?.loadRocketLeaguePlayers,
         onRocketLeagueUpdate: typeof bridge?.onRocketLeagueUpdate,
+        hideWindow: typeof bridge?.hideWindow,
+        toggleOverlay: typeof bridge?.toggleOverlay,
       };
     });
 
@@ -252,6 +347,8 @@ test("launches Electron, renders the app, exposes preload bridge, and automatica
       getRocketLeagueStatus: "function",
       loadRocketLeaguePlayers: "function",
       onRocketLeagueUpdate: "function",
+      hideWindow: "function",
+      toggleOverlay: "function",
     });
 
     await expect(page.getByText("GarrettG_TTV").first()).toBeVisible();
@@ -339,6 +436,10 @@ test("moves streamers below Previous Streamers when the board clears", async ({}
     await page.reload({ waitUntil: "domcontentloaded" });
     const streamers = page.getByRole("complementary");
     await expect(streamers.getByRole("button", { name: "Close GarrettG_TTV" })).toBeVisible();
+    const currentPlayers = page.getByRole("heading", { name: "Current Players" }).locator("../..");
+    const playerHeight = await currentPlayers.evaluate((element) => element.getBoundingClientRect().height);
+    const streamerHeight = await streamers.evaluate((element) => element.getBoundingClientRect().height);
+    expect(streamerHeight).toBe(playerHeight);
     await page.clock.install();
     await electronApp.evaluate(({ BrowserWindow }) => {
       for (const window of BrowserWindow.getAllWindows()) window.webContents.send("rocket-league:update", {
@@ -389,6 +490,9 @@ test("keeps ten previous streamers in a five-row scroll area", async ({}, testIn
 
     const previous = page.getByRole("region", { name: "Previous Streamers" });
     const list = previous.getByLabel("Previous streamer list");
+    const panel = page.getByRole("complementary");
+    expect(await panel.evaluate((element) => getComputedStyle(element).overflowY)).toBe("visible");
+    expect(await list.evaluate((element) => getComputedStyle(element).scrollbarWidth)).toBe("thin");
     await expect(previous.locator(".min-h-16")).toHaveCount(10);
     await expect(previous.getByText("Previous9", { exact: true })).toBeAttached();
     await expect(previous.getByText("Previous10", { exact: true })).toHaveCount(0);

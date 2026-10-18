@@ -1,4 +1,4 @@
-import type { RocketLeagueSetupAvailability } from "../../shared/ipc-contracts";
+import type { OverlaySettings, RocketLeagueSetupAvailability, WindowsStartupSettings } from "../../shared/ipc-contracts";
 
 declare module "*.css";
 
@@ -7,6 +7,12 @@ declare global {
     rocketLeagueViewer: {
       getSetupCompleted: () => Promise<boolean>;
       completeSetup: () => Promise<void>;
+      getWindowsStartupSettings: () => Promise<WindowsStartupSettings>;
+      setWindowsStartupEnabled: (enabled: boolean) => Promise<WindowsStartupSettings>;
+      getOverlaySettings: () => Promise<OverlaySettings>;
+      setOverlaySettings: (shortcut: string, panelTransparency: number) => Promise<OverlaySettings>;
+      hideWindow: () => Promise<void>;
+      toggleOverlay: () => Promise<void>;
       startTwitchAuth: () => Promise<any>;
       completeTwitchAuth: (flow: any) => Promise<any>;
       verifyTwitch: () => Promise<any>;

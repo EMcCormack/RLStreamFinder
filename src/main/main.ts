@@ -1,5 +1,8 @@
 import path from "node:path";
-import { app, autoUpdater, BrowserWindow, dialog, ipcMain, safeStorage, session, shell } from "electron";
+import { existsSync } from "node:fs";
+import { mkdir, rm, writeFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { app, autoUpdater, BrowserWindow, dialog, globalShortcut, ipcMain, safeStorage, screen, session, shell, Tray, Menu } from "electron";
 import squirrelStartup from "electron-squirrel-startup";
 import { TWITCH_CLIENT_ID, TWITCH_SCOPES } from "./services/app-config";
 import {
@@ -10,8 +13,12 @@ import {
 import { findDefaultRocketLeagueInstallations, getRocketLeagueSetupAvailability, setupRocketLeagueStats } from "./services/rocket-league-setup";
 import { RocketLeagueConnectionPoller } from "./services/rocket-league-poller";
 import { startWindowsUpdates } from "./services/app-updates";
-import { Channels } from "../shared/ipc-contracts";
-import { completeSetup, getSetupCompleted } from "./services/setup-preferences";
+import { ensureLinuxDesktopEntry, LINUX_DESKTOP_NAME, LINUX_DEV_DESKTOP_NAME } from "./services/linux-desktop-entry";
+import { isKdeWayland, KdeShortcutPortal } from "./services/kde-shortcut-portal";
+import { ensureKdeOverlayRule, isKdeDesktop } from "./services/kde-overlay-rule";
+import { Channels, type WindowsStartupSettings } from "../shared/ipc-contracts";
+import { equivalentOverlayShortcuts, normalizeOverlayShortcut, validatePanelTransparency, type OverlaySettings } from "../shared/overlay-settings";
+import { completeSetup, getLaunchWithRocketLeague, getOverlayPreferences, getSetupCompleted, setLaunchWithRocketLeague, setOverlayPreferences } from "./services/setup-preferences";
 import { checkPlayers } from "../shared/pipeline";
 import { TwitchApiError, TwitchAuthRequiredError, TwitchClient } from "./services/twitch";
 
@@ -19,6 +26,14 @@ declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
 const e2eUserDataDir = process.env.RL_STREAM_FINDER_E2E_USER_DATA_DIR;
+const kdeWayland = isKdeWayland() && !e2eUserDataDir;
+const usingXWayland = process.argv.includes("--ozone-platform=x11");
+const relaunchForKde = kdeWayland && app.isPackaged && !usingXWayland;
+if (relaunchForKde) {
+  app.relaunch({ args: [...process.argv.slice(1), "--ozone-platform=x11"] });
+  app.quit();
+}
+if (process.platform === "linux") app.setDesktopName(app.isPackaged ? LINUX_DESKTOP_NAME : LINUX_DEV_DESKTOP_NAME);
 if (e2eUserDataDir) {
   app.setPath("userData", e2eUserDataDir);
   app.setPath("sessionData", e2eUserDataDir);
@@ -28,12 +43,27 @@ if (squirrelStartup) {
   app.quit();
 }
 
+const hasSingleInstanceLock = relaunchForKde || squirrelStartup || app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) {
+  app.quit();
+}
+
 let mainWindow = null;
+let tray: Tray | null = null;
+let isQuitting = false;
+let isOverlayVisible = false;
+let regularWindowBounds: Electron.Rectangle | null = null;
+let registeredOverlayShortcut: string | null = null;
+let kdeShortcutPortal: KdeShortcutPortal | null = null;
+const startedInBackground = process.argv.includes("--launch-in-background");
+let quitWhenGameCloses = startedInBackground;
 let rocketLeagueClient = null;
 let rocketLeaguePoller: RocketLeagueConnectionPoller | null = null;
 let latestRocketLeagueSnapshot = null;
 let rocketLeagueDebugSequence = 0;
 const ENCRYPTED_TOKEN_PREFIX = "electron-safe-storage:v1:";
+
+app.on("before-quit", () => { isQuitting = true; });
 
 function getPlayerNames(snapshot) {
   return (snapshot?.players ?? [])
@@ -120,6 +150,16 @@ function registerTwitchEmbedHeaderPatch() {
   );
 }
 
+function getTopRightWindowBounds(preferredWidth: number, preferredHeight: number, currentBounds?: Electron.Rectangle): Electron.Rectangle {
+  const display = kdeWayland
+    ? currentBounds ? screen.getDisplayMatching(currentBounds) : screen.getPrimaryDisplay()
+    : screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+  const { workArea } = display;
+  const width = Math.min(preferredWidth, workArea.width);
+  const height = Math.min(preferredHeight, workArea.height);
+  return { x: workArea.x + workArea.width - width, y: workArea.y, width, height };
+}
+
 function createMainWindow() {
   const preloadPath = path.join(__dirname, "index.js");
 
@@ -128,11 +168,12 @@ function createMainWindow() {
   : path.join(app.getAppPath(), 'assets', 'icon.png');
 
   mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 820,
+    ...getTopRightWindowBounds(1280, 820),
     minWidth: 980,
     minHeight: 620,
-    backgroundColor: "#111317",
+    transparent: true,
+    frame: false,
+    show: !startedInBackground,
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,
@@ -141,6 +182,13 @@ function createMainWindow() {
     icon: iconPath,
   });
   mainWindow.removeMenu();
+  mainWindow.on("close", (event) => {
+    if (process.platform === "win32" && !isQuitting) {
+      event.preventDefault();
+      hideWindow();
+    }
+  });
+  mainWindow.on("closed", () => { mainWindow = null; });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//i.test(url)) {
@@ -181,6 +229,183 @@ function createMainWindow() {
   } else {
     mainWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
   }
+}
+
+function hideWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.hide();
+  mainWindow.setAlwaysOnTop(false);
+  isOverlayVisible = false;
+}
+
+function showRegularWindow() {
+  quitWhenGameCloses = false;
+  if (!mainWindow || mainWindow.isDestroyed()) createMainWindow();
+  mainWindow.setAlwaysOnTop(false);
+  if (regularWindowBounds) mainWindow.setBounds(regularWindowBounds);
+  isOverlayVisible = false;
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+function toggleOverlay() {
+  if (!mainWindow || mainWindow.isDestroyed()) createMainWindow();
+  if (isOverlayVisible && mainWindow.isVisible()) {
+    hideWindow();
+    return;
+  }
+
+  if (!isOverlayVisible && (mainWindow.isVisible() || !regularWindowBounds)) {
+    regularWindowBounds = mainWindow.getBounds();
+  }
+  mainWindow.setBounds(getTopRightWindowBounds(1100, 720, mainWindow.getBounds()));
+  mainWindow.setAlwaysOnTop(true, "screen-saver");
+  // Native Wayland cannot show this Electron window without activating it.
+  if (process.platform === "linux" && process.env.XDG_SESSION_TYPE === "wayland" && !usingXWayland) {
+    mainWindow.show();
+    mainWindow.focus();
+  } else {
+    mainWindow.showInactive();
+  }
+  isOverlayVisible = true;
+}
+
+function windowsBootstrapPath(): string | null {
+  if (process.platform !== "win32" || !app.isPackaged || e2eUserDataDir) return null;
+  const bootstrapExe = path.join(process.resourcesPath, "rl-stream-finder-bootstrap.exe");
+  return existsSync(bootstrapExe) ? bootstrapExe : null;
+}
+
+function windowsBootstrapMarkerPath(): string {
+  return path.join(app.getPath("userData"), "launch-with-rocket-league.enabled");
+}
+
+async function applyWindowsStartup(enabled: boolean, bootstrapExe: string): Promise<void> {
+  const markerPath = windowsBootstrapMarkerPath();
+  if (enabled) {
+    await mkdir(path.dirname(markerPath), { recursive: true });
+    await writeFile(markerPath, "", "utf8");
+  } else {
+    await rm(markerPath, { force: true });
+  }
+  app.setLoginItemSettings({ openAtLogin: enabled, path: bootstrapExe, args: [markerPath] });
+}
+
+async function getWindowsStartupSettings(): Promise<WindowsStartupSettings> {
+  const supported = windowsBootstrapPath() !== null;
+  return { supported, enabled: supported && await getLaunchWithRocketLeague(app.getPath("userData")) };
+}
+
+async function setWindowsStartupEnabled(enabled: boolean): Promise<WindowsStartupSettings> {
+  if (typeof enabled !== "boolean") throw new TypeError("Startup setting must be a boolean.");
+  const bootstrapExe = windowsBootstrapPath();
+  if (!bootstrapExe) throw new Error("Windows startup is unavailable in this build.");
+  const previous = await getLaunchWithRocketLeague(app.getPath("userData"));
+  try {
+    await applyWindowsStartup(enabled, bootstrapExe);
+    await setLaunchWithRocketLeague(app.getPath("userData"), enabled);
+  } catch (error) {
+    try {
+      await applyWindowsStartup(previous, bootstrapExe);
+    } catch (rollbackError) {
+      console.warn("Could not restore Windows sign-in launch setting:", rollbackError);
+    }
+    throw error;
+  }
+  return { supported: true, enabled };
+}
+
+async function configureWindowsStartup() {
+  const bootstrapExe = windowsBootstrapPath();
+  if (!bootstrapExe) return;
+  try {
+    await applyWindowsStartup(await getLaunchWithRocketLeague(app.getPath("userData")), bootstrapExe);
+  } catch (error) {
+    console.warn("Could not apply Windows sign-in launch setting:", error);
+  }
+}
+
+function createTray() {
+  if (process.platform !== "win32") return;
+  const iconPath = app.isPackaged
+    ? path.join(process.resourcesPath, "icon.png")
+    : path.join(app.getAppPath(), "assets", "icon.png");
+  tray = new Tray(iconPath);
+  updateTrayMenu();
+  tray.on("double-click", showRegularWindow);
+}
+
+function updateTrayMenu() {
+  if (!tray) return;
+  const shortcut = registeredOverlayShortcut ?? "shortcut unavailable";
+  tray.setToolTip(`RLStreamFinder · ${shortcut} toggles overlay`);
+  tray.setContextMenu(Menu.buildFromTemplate([
+    { label: "Open RLStreamFinder", click: showRegularWindow },
+    { label: `Toggle overlay (${shortcut})`, click: toggleOverlay },
+    { type: "separator" },
+    { label: "Quit", click: () => { isQuitting = true; app.quit(); } },
+  ]));
+}
+
+async function getOverlaySettings(): Promise<OverlaySettings> {
+  const preferences = await getOverlayPreferences(app.getPath("userData"));
+  return { ...preferences, shortcutActive: Boolean(registeredOverlayShortcut && equivalentOverlayShortcuts(registeredOverlayShortcut, preferences.shortcut, process.platform === "darwin")) };
+}
+
+async function setOverlaySettings(shortcut: string, panelTransparency: number): Promise<OverlaySettings> {
+  const normalizedShortcut = normalizeOverlayShortcut(shortcut);
+  validatePanelTransparency(panelTransparency);
+  const previousShortcut = registeredOverlayShortcut;
+  const effectiveShortcut = previousShortcut && equivalentOverlayShortcuts(previousShortcut, normalizedShortcut, process.platform === "darwin")
+    ? previousShortcut : normalizedShortcut;
+  const changedShortcut = effectiveShortcut !== previousShortcut;
+  if (changedShortcut) {
+    if (kdeShortcutPortal) {
+      try {
+        if (!await kdeShortcutPortal.bind(effectiveShortcut)) {
+          throw new Error("KDE did not bind that shortcut. Choose another combination in KDE Shortcuts.");
+        }
+      } catch (error) {
+        if (previousShortcut) {
+          try { await kdeShortcutPortal.bind(previousShortcut); }
+          catch (restoreError) { console.warn("Could not restore the previous KDE shortcut:", restoreError); }
+        }
+        throw error;
+      }
+    } else if (!globalShortcut.register(effectiveShortcut, toggleOverlay)) {
+      throw new Error("That shortcut is unavailable. Choose another key combination.");
+    }
+  }
+  try {
+    await setOverlayPreferences(app.getPath("userData"), effectiveShortcut, panelTransparency);
+  } catch (error) {
+    if (changedShortcut) {
+      if (kdeShortcutPortal && previousShortcut) await kdeShortcutPortal.bind(previousShortcut);
+      else if (!kdeShortcutPortal) globalShortcut.unregister(effectiveShortcut);
+    }
+    throw error;
+  }
+  if (changedShortcut) {
+    if (previousShortcut && !kdeShortcutPortal) globalShortcut.unregister(previousShortcut);
+    registeredOverlayShortcut = effectiveShortcut;
+    updateTrayMenu();
+  }
+  return { shortcut: effectiveShortcut, shortcutActive: true, panelTransparency };
+}
+
+function stopWhenRocketLeagueCloses() {
+  if (process.platform !== "win32" || !startedInBackground) return;
+  const timer = setInterval(() => {
+    if (!quitWhenGameCloses || isQuitting) return;
+    execFile("tasklist", ["/FI", "IMAGENAME eq RocketLeague.exe", "/FO", "CSV", "/NH"],
+      { windowsHide: true }, (error, stdout) => {
+        if (!error && !/^"RocketLeague\.exe",/im.test(stdout) && quitWhenGameCloses) {
+          isQuitting = true;
+          app.quit();
+        }
+      });
+  }, 10000);
+  app.once("before-quit", () => clearInterval(timer));
 }
 
 function sendRocketLeagueSnapshot(snapshot) {
@@ -340,9 +565,56 @@ function createTokenCodec() {
   };
 }
 
-if (!squirrelStartup) app.whenReady().then(() => {
+if (!squirrelStartup && !relaunchForKde && hasSingleInstanceLock) app.whenReady().then(async () => {
+  app.on("second-instance", (_event, argv) => {
+    if (!argv.includes("--launch-in-background")) showRegularWindow();
+  });
+  await configureWindowsStartup();
+  if (process.platform === "linux" && !e2eUserDataDir) {
+    try {
+      if (app.isPackaged) {
+        await ensureLinuxDesktopEntry(process.execPath, path.join(process.resourcesPath, "icon.png"));
+      } else {
+        await ensureLinuxDesktopEntry(process.execPath, path.join(app.getAppPath(), "assets", "icon.png"), undefined, LINUX_DEV_DESKTOP_NAME, [app.getAppPath()]);
+      }
+    } catch (error) {
+      console.warn("Could not install Linux desktop entry for global shortcuts:", error);
+    }
+  }
+  if (isKdeDesktop() && !e2eUserDataDir) {
+    try {
+      await ensureKdeOverlayRule(app.isPackaged ? LINUX_DESKTOP_NAME : LINUX_DEV_DESKTOP_NAME);
+    } catch (error) {
+      console.warn("Could not set KDE overlay stacking rule:", error);
+    }
+  }
+  const overlayPreferences = await getOverlayPreferences(app.getPath("userData"));
+  if (kdeWayland) {
+    kdeShortcutPortal = new KdeShortcutPortal(toggleOverlay);
+    try {
+      if (await kdeShortcutPortal.bind(overlayPreferences.shortcut)) registeredOverlayShortcut = overlayPreferences.shortcut;
+      else console.warn(`KDE did not bind overlay shortcut ${overlayPreferences.shortcut}.`);
+    } catch (error) {
+      console.warn("Could not register KDE overlay shortcut:", error);
+    }
+  } else if (globalShortcut.register(overlayPreferences.shortcut, toggleOverlay)) {
+    registeredOverlayShortcut = overlayPreferences.shortcut;
+  } else {
+    console.warn(`Unable to register overlay shortcut ${overlayPreferences.shortcut}.`);
+  }
+  createTray();
+  app.once("will-quit", () => {
+    if (kdeShortcutPortal) kdeShortcutPortal.stop();
+    else if (registeredOverlayShortcut) globalShortcut.unregister(registeredOverlayShortcut);
+  });
+  ipcMain.handle(Channels.WINDOW_HIDE, hideWindow);
+  ipcMain.handle(Channels.WINDOW_TOGGLE_OVERLAY, toggleOverlay);
   ipcMain.handle(Channels.SETUP_STATUS, () => getSetupCompleted(app.getPath("userData")));
   ipcMain.handle(Channels.SETUP_COMPLETE, () => completeSetup(app.getPath("userData")));
+  ipcMain.handle(Channels.WINDOWS_STARTUP_GET, getWindowsStartupSettings);
+  ipcMain.handle(Channels.WINDOWS_STARTUP_SET, (_event, enabled: boolean) => setWindowsStartupEnabled(enabled));
+  ipcMain.handle(Channels.OVERLAY_SETTINGS_GET, getOverlaySettings);
+  ipcMain.handle(Channels.OVERLAY_SETTINGS_SET, (_event, shortcut: string, transparency: number) => setOverlaySettings(shortcut, transparency));
   registerTwitchEmbedHeaderPatch();
   let twitchClient: TwitchClient | null = null;
   function createTwitchClient() {
@@ -531,6 +803,7 @@ if (!squirrelStartup) app.whenReady().then(() => {
   });
 
   createMainWindow();
+  stopWhenRocketLeagueCloses();
 
   const stopUpdates = startWindowsUpdates({
     isPackaged: app.isPackaged,
@@ -542,6 +815,8 @@ if (!squirrelStartup) app.whenReady().then(() => {
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createMainWindow();
+    } else {
+      showRegularWindow();
     }
   });
 });

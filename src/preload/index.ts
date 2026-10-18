@@ -8,6 +8,24 @@ contextBridge.exposeInMainWorld("rocketLeagueViewer", {
   completeSetup() {
     return ipcRenderer.invoke(Channels.SETUP_COMPLETE);
   },
+  getWindowsStartupSettings() {
+    return ipcRenderer.invoke(Channels.WINDOWS_STARTUP_GET);
+  },
+  setWindowsStartupEnabled(enabled: boolean) {
+    return ipcRenderer.invoke(Channels.WINDOWS_STARTUP_SET, enabled);
+  },
+  getOverlaySettings() {
+    return ipcRenderer.invoke(Channels.OVERLAY_SETTINGS_GET);
+  },
+  setOverlaySettings(shortcut: string, panelTransparency: number) {
+    return ipcRenderer.invoke(Channels.OVERLAY_SETTINGS_SET, shortcut, panelTransparency);
+  },
+  hideWindow() {
+    return ipcRenderer.invoke(Channels.WINDOW_HIDE);
+  },
+  toggleOverlay() {
+    return ipcRenderer.invoke(Channels.WINDOW_TOGGLE_OVERLAY);
+  },
   startTwitchAuth() {
     return ipcRenderer.invoke(Channels.TWITCH_START_AUTH);
   },

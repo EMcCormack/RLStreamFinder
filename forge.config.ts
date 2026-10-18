@@ -2,6 +2,7 @@ import type { ForgeConfig, ForgeConfigMaker } from "@electron-forge/shared-types
 import { MakerSquirrel } from "@electron-forge/maker-squirrel";
 import { MakerZIP } from "@electron-forge/maker-zip";
 import { VitePlugin } from "@electron-forge/plugin-vite";
+import { execFileSync } from "node:child_process";
 
 const buildProfile = process.env.BUILD_PROFILE;
 const makers: ForgeConfigMaker[] = [
@@ -19,9 +20,21 @@ const config: ForgeConfig = {
     asar: true,
     executableName: "rl-stream-finder",
     icon: "./assets/icon",
-    extraResource: ["./assets/icon.png"],
+    extraResource: [
+      "./assets/icon.png",
+      ...(process.platform === "win32" ? ["./bootstrap/target/release/rl-stream-finder-bootstrap.exe"] : []),
+    ],
   },
-  rebuildConfig: {},
+  // dbus-next optionally depends on obsolete usocket, but the KDE portal path
+  // is normalized to use Node's built-in socket support instead.
+  rebuildConfig: { ignoreModules: ["usocket"] },
+  hooks: {
+    prePackage: async (_config, platform) => {
+      if (platform === "win32") {
+        execFileSync("cargo", ["build", "--release", "--manifest-path", "bootstrap/Cargo.toml"], { stdio: "inherit" });
+      }
+    },
+  },
   makers,
   plugins: [
     new VitePlugin({

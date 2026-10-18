@@ -9,11 +9,17 @@ Use GitHub Actions for binaries that users will download. It builds on Windows a
 3. In the GitHub Actions tab, open **Build release candidate**, choose the tag in **Use workflow from**, and click **Run workflow**. The workflow checks the version, runs TypeScript and unit tests, builds a Windows Squirrel installer and Linux ZIP, and creates a **draft prerelease** with those downloads, the Windows update assets (`RELEASES` and `.nupkg` files), and `SHA256SUMS`.
 4. Download the release assets. Extract and run the Linux ZIP, or run the Windows installer and confirm the app appears in the Start menu. Check Rocket League connection, Twitch sign-in, and a live roster. Review the draft's notes and files before publishing it in GitHub Releases.
 
-The workflow must be run from an existing version tag and rejects branch selections. It does not create a tag or publish the draft. If a draft already exists for the tag, delete the stale draft first or choose a new version/tag; the workflow does not replace release files.
+For a release candidate, choose an existing version tag. The workflow checks that the tag matches `package.json`. It does not create a tag or publish the draft. If a draft already exists for the tag, delete the stale draft first or choose a new version/tag; the workflow does not replace release files.
+
+## Test a feature branch on Windows
+
+Use **Build release candidate** in the Actions tab. Choose the feature branch under **Use workflow from** and click **Run workflow**. When run from a branch, the workflow checks TypeScript and unit tests, then builds Windows and Linux artifacts without creating a tag or release. Open the completed run, download `rl-stream-finder-windows` from **Artifacts**, extract the ZIP, and run the Squirrel setup executable on Windows. No local Node.js or Rust toolchain is needed. If version `0.1.0` is already installed, uninstall it first; the test installer uses the version in `package.json` and may not replace an installed build with the same version.
+
+Use a fresh install to test the optional **Launch with Rocket League** setting, then sign out and back in to verify startup. Turn the setting off and confirm the watcher exits and no longer starts at sign-in. The branch artifact is for testing and does not enter the update feed.
 
 ## Local build commands
 
-Run `pnpm install --frozen-lockfile` first. On Windows, use `pnpm make:windows`. On Linux, use `pnpm make:linux:zip`. Outputs are under `out/make/`. `pnpm package` creates an unpacked app for a quick local check.
+Run `pnpm install --frozen-lockfile` first. Windows builds also need the stable Rust toolchain; Forge compiles the startup watcher during packaging. On Windows, use `pnpm make:windows`. On Linux, use `pnpm make:linux:zip`. Outputs are under `out/make/`. `pnpm package` creates an unpacked app for a quick local check.
 
 Windows builds are currently unsigned. Treat the first binaries as a preview and complete signing before a broad stable release.
 
