@@ -1,9 +1,10 @@
 import { test, expect } from "vitest";
-import { nodeSocketBusAddress, portalShortcutId, portalTrigger } from "../src/main/services/kde-shortcut-portal";
+import { nodeSocketBusAddress, PORTAL_SHORTCUT_ID, portalTrigger } from "../src/main/services/kde-shortcut-portal";
 
-test("uses a stable KDE action ID for the same shortcut", () => {
-  expect(portalShortcutId("Control+Alt+R")).toBe("toggle_overlay_control_alt_r");
-  expect(portalShortcutId("Control+Alt+Y")).toBe("toggle_overlay_control_alt_y");
+test("uses one KDE action ID for the overlay regardless of its trigger", () => {
+  expect(PORTAL_SHORTCUT_ID).toBe("toggle_overlay");
+  expect(portalTrigger("Control+Alt+R")).toBe("CTRL+ALT+r");
+  expect(portalTrigger("Control+Alt+Y")).toBe("CTRL+ALT+y");
 });
 
 test("converts an Electron shortcut to the XDG trigger format", () => {

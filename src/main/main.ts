@@ -148,8 +148,11 @@ function registerTwitchEmbedHeaderPatch() {
   );
 }
 
-function getTopRightWindowBounds(preferredWidth: number, preferredHeight: number): Electron.Rectangle {
-  const { workArea } = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+function getTopRightWindowBounds(preferredWidth: number, preferredHeight: number, currentBounds?: Electron.Rectangle): Electron.Rectangle {
+  const display = kdeWayland
+    ? currentBounds ? screen.getDisplayMatching(currentBounds) : screen.getPrimaryDisplay()
+    : screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+  const { workArea } = display;
   const width = Math.min(preferredWidth, workArea.width);
   const height = Math.min(preferredHeight, workArea.height);
   return { x: workArea.x + workArea.width - width, y: workArea.y, width, height };
@@ -253,7 +256,7 @@ function toggleOverlay() {
   if (!isOverlayVisible && (mainWindow.isVisible() || !regularWindowBounds)) {
     regularWindowBounds = mainWindow.getBounds();
   }
-  mainWindow.setBounds(getTopRightWindowBounds(1100, 720));
+  mainWindow.setBounds(getTopRightWindowBounds(1100, 720, mainWindow.getBounds()));
   mainWindow.setAlwaysOnTop(true, "screen-saver");
   // Native Wayland cannot show this Electron window without activating it.
   if (process.platform === "linux" && process.env.XDG_SESSION_TYPE === "wayland" && !usingXWayland) {

@@ -25,6 +25,7 @@ test("creates a separate development desktop entry for Wayland shortcuts", async
     const entry = await readFile(path.join(dataHome, "applications", LINUX_DEV_DESKTOP_NAME), "utf8");
     const ozoneArgument = isKdeWayland() ? '"--ozone-platform=x11" ' : "";
     expect(entry).toContain(`Exec="/repo/node_modules/electron/dist/electron" ${ozoneArgument}"/repo"`);
+    expect(entry).toContain("Name=RLStreamFinder (Dev)");
     expect(entry).toContain("Icon=/repo/assets/icon.png");
   } finally {
     await rm(dataHome, { recursive: true, force: true });

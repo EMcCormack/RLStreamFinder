@@ -21,10 +21,11 @@ export async function ensureLinuxDesktopEntry(
   const applicationsDirectory = path.join(baseDirectory, "applications");
   await mkdir(applicationsDirectory, { recursive: true });
   const launcherArgs = [executablePath, ...(isKdeWayland() ? ["--ozone-platform=x11"] : []), ...execArgs];
+  const displayName = desktopName === LINUX_DEV_DESKTOP_NAME ? "RLStreamFinder (Dev)" : "RLStreamFinder";
   const content = [
     "[Desktop Entry]",
     "Type=Application",
-    "Name=RLStreamFinder",
+    `Name=${displayName}`,
     `Exec=${launcherArgs.map(desktopExecArgument).join(" ")}`,
     `Icon=${iconPath}`,
     "Categories=Game;Utility;",

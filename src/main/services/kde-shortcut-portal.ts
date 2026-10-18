@@ -4,14 +4,11 @@ const PORTAL_NAME = "org.freedesktop.portal.Desktop";
 const PORTAL_PATH = "/org/freedesktop/portal/desktop";
 const GLOBAL_SHORTCUTS = "org.freedesktop.portal.GlobalShortcuts";
 const REQUEST = "org.freedesktop.portal.Request";
+export const PORTAL_SHORTCUT_ID = "toggle_overlay";
 
 export function isKdeWayland(environment: NodeJS.ProcessEnv = process.env): boolean {
   return process.platform === "linux" && environment.XDG_SESSION_TYPE === "wayland" &&
     (environment.XDG_CURRENT_DESKTOP ?? "").split(":").some((desktop) => desktop.toLowerCase() === "kde");
-}
-
-export function portalShortcutId(shortcut: string): string {
-  return `toggle_overlay_${shortcut.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`;
 }
 
 export function portalTrigger(shortcut: string): string {
@@ -98,7 +95,7 @@ export class KdeShortcutPortal {
   async bind(shortcut: string): Promise<boolean> {
     await this.connect();
     await this.closeSession();
-    const id = portalShortcutId(shortcut);
+    const id = PORTAL_SHORTCUT_ID;
     const token = `rlsf_${process.pid}_${++this.counter}`;
     const sessionRequest = await this.portal!.CreateSession({
       handle_token: new dbus.Variant("s", `${token}_create`),
