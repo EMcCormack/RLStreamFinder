@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { launchTestElectron } from "./launch-electron";
 
-test("uses a transparent window and toggles the overlay above other windows", async ({}, testInfo) => {
+test("uses a transparent window and preserves its size when toggling the overlay", async ({}, testInfo) => {
   const electronApp = await launchTestElectron(testInfo);
   try {
     const page = await electronApp.firstWindow();
@@ -15,8 +15,24 @@ test("uses a transparent window and toggles the overlay above other windows", as
     expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
     await page.evaluate(() => window.rocketLeagueViewer.toggleOverlay());
     expect(await electronApp.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isAlwaysOnTop())).toBe(true);
+    expect(await electronApp.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getBounds())).toEqual(bounds);
     await page.evaluate(() => window.rocketLeagueViewer.toggleOverlay());
     expect(await electronApp.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible())).toBe(false);
+    await page.evaluate(() => window.rocketLeagueViewer.toggleOverlay());
+    expect(await electronApp.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible())).toBe(true);
+    expect(await electronApp.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getBounds())).toEqual(bounds);
+
+    const resizedBounds = await electronApp.evaluate(({ BrowserWindow }) => {
+      const window = BrowserWindow.getAllWindows()[0];
+      const currentBounds = window.getBounds();
+      window.setSize(currentBounds.width - 40, currentBounds.height - 40);
+      return window.getBounds();
+    });
+    await page.evaluate(() => window.rocketLeagueViewer.toggleOverlay());
+    await page.evaluate(() => window.rocketLeagueViewer.toggleOverlay());
+    const reopenedBounds = await electronApp.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getBounds());
+    expect(reopenedBounds.width).toBe(resizedBounds.width);
+    expect(reopenedBounds.height).toBe(resizedBounds.height);
   } finally {
     await electronApp.close();
   }

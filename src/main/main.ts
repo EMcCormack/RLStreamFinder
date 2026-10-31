@@ -258,7 +258,8 @@ function toggleOverlay() {
   if (!isOverlayVisible && (mainWindow.isVisible() || !regularWindowBounds)) {
     regularWindowBounds = mainWindow.getBounds();
   }
-  mainWindow.setBounds(getTopRightWindowBounds(1100, 720, mainWindow.getBounds()));
+  const currentBounds = mainWindow.getBounds();
+  mainWindow.setBounds(getTopRightWindowBounds(currentBounds.width, currentBounds.height, currentBounds));
   mainWindow.setAlwaysOnTop(true, "screen-saver");
   // Native Wayland cannot show this Electron window without activating it.
   if (process.platform === "linux" && process.env.XDG_SESSION_TYPE === "wayland" && !usingXWayland) {

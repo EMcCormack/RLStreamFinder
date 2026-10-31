@@ -2,7 +2,7 @@
   "name": "rl-stream-finder",
   "productName": "RLStreamFinder",
   "desktopName": "com.emcormack.rlstreamfinder.desktop",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Find live streamers in your Rocket League matches.",
   "author": "Ethan McCormack",
   "packageManager": "pnpm@11.3.0",
